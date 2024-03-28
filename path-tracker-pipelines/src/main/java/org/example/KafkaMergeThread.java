@@ -67,7 +67,7 @@ public class KafkaMergeThread implements  Runnable {
                 }
                 foundEmptyQueue = false;
             }
-
+            System.out.println("Initialized queues");
             while (running) {
                 // Pop smallest item
                 minHeapTuple smallest = minHeap.remove();

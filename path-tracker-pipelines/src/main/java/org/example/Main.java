@@ -47,17 +47,11 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
 
-//        KafkaContainer kafka = new KafkaContainer(DockerImageName.parse(
-//                "confluentinc/cp-kafka:6.2.1"));
-//        kafka.start();
-        int  messageSendBurstMilli = 200;
         String bootstrapServer = "localhost:9092";
 
-
-        Properties prop = new Properties();
-        prop.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
         StreamExecutionEnvironment env = createPipeline(bootstrapServer);
         int partitionCount = PathAnalyzer.computePathNum(env);
+        System.out.println("Partition Count: " + partitionCount);
 
         String topicName = "test_topic";
         Properties properties = new Properties();
@@ -93,7 +87,9 @@ public class Main {
         try {
             env.execute();
             System.out.println("Environment finished executing");
-            Thread.sleep(10000); // Make sure it finishes
+            while(true) {
+
+            }
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -117,7 +113,7 @@ public class Main {
 
         env.addSource(new TestDataSource(100)).setParallelism(1)
                 // filter out multiples of 7
-                .filter(new TestRichFilterFunctionImpl()).setParallelism(3)
+//                .filter(new TestRichFilterFunctionImpl()).setParallelism(3)
                 .rescale()
                 // multiply by 2
                 .map(new TestRichMapFunctionImplForMul2()).setParallelism(4)

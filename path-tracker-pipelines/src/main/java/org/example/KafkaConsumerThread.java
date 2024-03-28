@@ -60,6 +60,7 @@ public class KafkaConsumerThread implements Runnable{
                 int pollTimeMilli = 1000;
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(
                         pollTimeMilli));
+//                System.out.println("Got " + records.count() + " records");
                 for (ConsumerRecord<String, String> record : records) {
                     this.matcher = regex.matcher(record.value());
                     if(matcher.matches()){
@@ -67,6 +68,7 @@ public class KafkaConsumerThread implements Runnable{
                         int value = Integer.parseInt(matcher.group(2));
                         kafkaMessage message = new kafkaMessage(seqNum, value, System.nanoTime());
                         partitionQueue[record.partition()].offer(message);
+                        System.out.println("Partition: " + record.partition() + " value: " + seqNum + " Key: " + record.key());
                     }
                     else {
                         System.out.println("data is not in correct format closing");
