@@ -38,34 +38,70 @@ import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 import java.util.Collections;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Main {
 
     // topic for queues
-    private static String OUTPUT_TOPIC = "test-output-topic";
+    private static String OUTPUT_TOPIC = "test_topic";
 
     public static void main(String[] args) throws Exception {
 
-        KafkaContainer kafka = new KafkaContainer(DockerImageName.parse(
-                "confluentinc/cp-kafka:6.2.1"));
-        kafka.start();
+//        KafkaContainer kafka = new KafkaContainer(DockerImageName.parse(
+//                "confluentinc/cp-kafka:6.2.1"));
+//        kafka.start();
+        int  messageSendBurstMilli = 200;
+        String bootstrapServer = "localhost:9092";
+
 
         Properties prop = new Properties();
-        prop.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
+        prop.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
+        StreamExecutionEnvironment env = createPipeline(bootstrapServer);
+        int partitionCount = PathAnalyzer.computePathNum(env);
 
-        AdminClient adminClient = KafkaAdminClient.create(prop);
+        String topicName = "test_topic";
+        Properties properties = new Properties();
+        properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
 
-        StreamExecutionEnvironment env = createPipeline(kafka.getBootstrapServers());
+        // Create a topic in the cluster with a partition per path
+        try (AdminClient adminClient = AdminClient.create(properties)) {
+            NewTopic newTopic = new NewTopic(topicName, partitionCount, (short) 1);
+            adminClient.createTopics(Collections.singleton(newTopic)).all().get();
+            System.out.println("Topic created successfully");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
-        int pathNum = PathAnalyzer.computePathNum(env);
+        ConcurrentLinkedQueue<kafkaMessage>[] queue = new ConcurrentLinkedQueue[partitionCount];
+        for(int i = 0; i < partitionCount; i++) {
+            queue[i] = new ConcurrentLinkedQueue<>();
+        }
 
-        // create topic with partition num = path num
-        NewTopic newTopic = new NewTopic(OUTPUT_TOPIC, pathNum, (short) 1);
-        adminClient.createTopics(Collections.singleton(newTopic));
+        // Make consumer, and merger
+        KafkaMergeThread mergeThread = new KafkaMergeThread(partitionCount, queue);
+        KafkaConsumerThread consumeThread = new KafkaConsumerThread(bootstrapServer, partitionCount, queue);
 
+        Thread merge = new Thread(mergeThread);
+        Thread consume = new Thread(consumeThread);
 
-        env.execute();
+        merge.setDaemon(true);
+        consume.setDaemon(true);
 
+        consume.start();
+        merge.start();
+
+        try {
+            env.execute();
+            System.out.println("Environment finished executing");
+            Thread.sleep(10000); // Make sure it finishes
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            System.out.println("Closing Consumer and producer");
+            consumeThread.stopRunning();
+            System.out.println("Stopping merge");
+            mergeThread.stopRunning();
+        }
 
     }
 
