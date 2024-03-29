@@ -72,7 +72,7 @@ public class KafkaMergeThread implements  Runnable {
                 minHeapTuple smallest = minHeap.remove();
                 ConcurrentLinkedQueue<kafkaMessage> q = smallest.q;
                 int sequenceNum = smallest.priority;
-                long processingTime = System.nanoTime() - smallest.createTime;
+                long processingTime = System.currentTimeMillis() - smallest.createTime;
 
                 latencies.add(processingTime);
                 numEvents++;
