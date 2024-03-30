@@ -22,6 +22,14 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartPanel;
+import org.jfree.chart.JFreeChart;
+import org.jfree.data.statistics.HistogramDataset;
+import javax.swing.*;
+import java.awt.*;
+
 
 public class KafkaMergeThread implements  Runnable {
         private volatile boolean running = true;
@@ -103,8 +111,9 @@ public class KafkaMergeThread implements  Runnable {
         }
         public void stopRunning() {
             running = false;
-            System.out.println("Latency Values " + this.latencies.size());
-            System.out.println("Throughput values: " + this.throughput.size());
+            statistics.getDescriptiveStats(latencies, throughput);
+//            System.out.println("Latency Values " + this.latencies.size());
+//            System.out.println("Throughput values: " + this.throughput.size());
         }
 
     static class minHeapTuple{
@@ -118,3 +127,50 @@ public class KafkaMergeThread implements  Runnable {
             }
         }
     }
+
+    class statistics {
+        public static void getDescriptiveStats(ArrayList<Long> latency, ArrayList<Double> throughput)    {
+            long [] latencyArray = new long[latency.size()];
+            double [] throughputArray = new double[throughput.size()];
+
+            DescriptiveStatistics throughputStats = new DescriptiveStatistics();
+            for(int i = 0; i < throughput.size(); i++) {
+                throughputStats.addValue(throughput.get((i)));
+                throughputArray[i] = throughput.get(i);
+            }
+            DescriptiveStatistics latencyStats = new DescriptiveStatistics();
+
+            for(int i = 0; i < latency.size(); i++) {
+                latencyStats.addValue(latency.get((i)));
+                latencyArray[i] = latency.get(i);
+            }
+
+            System.out.println("Throughput Mean: " + throughputStats.getMean());
+            System.out.println("Throughput Standard Deviation: " + throughputStats.getStandardDeviation());
+            System.out.println("Throughput Variance: " + throughputStats.getVariance());
+
+            System.out.println("Latency Mean: " + latencyStats.getMean());
+            System.out.println("Latency Standard Deviation: " + latencyStats.getStandardDeviation());
+            System.out.println("Latency Variance: " + latencyStats.getVariance());
+
+            int numberOfBins = 10; // Number of bins for histogram
+
+            // Create and display the histogram
+            SwingUtilities.invokeLater(() -> {
+                HistogramExample example = new HistogramExample("Throughput Graph", throughputArray, numberOfBins);
+                example.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                example.pack();
+                example.setVisible(true);
+            });
+
+            SwingUtilities.invokeLater(() -> {
+                HistogramExample example = new HistogramExample("Latency Graph", latencyArray, numberOfBins);
+                example.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                example.pack();
+                example.setVisible(true);
+            });
+
+        }
+}
+
+
