@@ -98,7 +98,7 @@ public class Main {
         try {
             env.execute();
 
-            Thread.sleep(20000);
+            Thread.sleep(10000);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {

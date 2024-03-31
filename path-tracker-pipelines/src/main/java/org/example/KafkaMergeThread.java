@@ -84,6 +84,9 @@ public class KafkaMergeThread implements  Runnable {
 
                 latencies.add(processingTime);
                 numEvents++;
+                long totalTime = (System.currentTimeMillis() - startTime) / 1000 ;
+                double throughput_curr = (double) numEvents / totalTime;
+                this.throughput.add(throughput_curr);
 
 //                System.out.print(sequenceNum + " "); // uncomment to verify correctness
 
@@ -104,16 +107,14 @@ public class KafkaMergeThread implements  Runnable {
                     minHeapTuple curr = new minHeapTuple(nextNumUnpacked, q, nextNum.arrivalTime);
                     minHeap.add(curr);
                 }
-                long totalTime = (System.currentTimeMillis() - startTime) / 1000 ;
-                double throughput_curr = (double) numEvents / totalTime;
-                this.throughput.add(throughput_curr);
+
             }
         }
         public void stopRunning() {
             running = false;
             statistics.getDescriptiveStats(latencies, throughput);
-//            System.out.println("Latency Values " + this.latencies.size());
-//            System.out.println("Throughput values: " + this.throughput.size());
+            System.out.println("Latency Values " + this.latencies.size());
+            System.out.println("Throughput values: " + this.throughput.size());
         }
 
     static class minHeapTuple{
@@ -153,18 +154,18 @@ public class KafkaMergeThread implements  Runnable {
             System.out.println("Latency Standard Deviation: " + latencyStats.getStandardDeviation());
             System.out.println("Latency Variance: " + latencyStats.getVariance());
 
-            int numberOfBins = 10; // Number of bins for histogram
+            int numberOfBins = 20; // Number of bins for histogram
 
             // Create and display the histogram
             SwingUtilities.invokeLater(() -> {
-                HistogramExample example = new HistogramExample("Throughput Graph", throughputArray, numberOfBins);
+                HistogramExample example = new HistogramExample("Conflux throughput", throughputArray, numberOfBins, 16);
                 example.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
                 example.pack();
                 example.setVisible(true);
             });
 
             SwingUtilities.invokeLater(() -> {
-                HistogramExample example = new HistogramExample("Latency Graph", latencyArray, numberOfBins);
+                HistogramExample example = new HistogramExample("Conflux per record latency", latencyArray, numberOfBins, 25);
                 example.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
                 example.pack();
                 example.setVisible(true);
