@@ -54,6 +54,11 @@ under the License.
 			<version>${flink.version}</version>
 		</dependency>
 
+		<dependency>
+			<groupId>org.jfree</groupId>
+			<artifactId>jfreechart</artifactId>
+			<version>1.5.3</version> <!-- Replace with the latest version -->
+		</dependency>
 
 
 		<!-- https://mvnrepository.com/artifact/org.apache.flink/flink-clients -->
