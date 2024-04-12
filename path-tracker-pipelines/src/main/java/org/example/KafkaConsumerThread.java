@@ -53,7 +53,7 @@ public class KafkaConsumerThread implements Runnable{
             consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
             consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
             this.consumer = new KafkaConsumer<>(consumerProps);
-            this.consumer.subscribe(Collections.singletonList("test_topic")); // Need to update with partition topic
+            this.consumer.subscribe(Collections.singletonList("test_topic")); // Need to update with watermark topic
             this.partitionQueue = queue;
             this.regex = Pattern.compile(pattern);
             this.watermark = watermark;
