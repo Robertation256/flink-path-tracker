@@ -151,7 +151,7 @@ public class KafkaMergeThread implements  Runnable {
         int partitionNumber;
         public minHeapTuple(int priority, ConcurrentLinkedQueue<kafkaMessage> queue, long time, int partitionNumber) {
             this.priority = priority;
-            this.q = queue;
+            this.q = queue; // No longer needed as we can just index into the queue list using partitionNumber but will leave for now
             this.createTime = time;
             this.partitionNumber = partitionNumber;
             }
