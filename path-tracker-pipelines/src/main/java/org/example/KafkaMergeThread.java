@@ -21,15 +21,9 @@ package org.example;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.PriorityQueue;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
-import org.jfree.chart.ChartFactory;
-import org.jfree.chart.ChartPanel;
-import org.jfree.chart.JFreeChart;
-import org.jfree.data.statistics.HistogramDataset;
 import javax.swing.*;
-import java.awt.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
@@ -109,7 +103,7 @@ public class KafkaMergeThread implements  Runnable {
 
                 // if len(heap) == pathNum or heap.peek() < watermark
                 // Pop smallest item
-                if(minHeap.size() == partitionCount || minHeap.peek() !=null && minHeap.peek().priority <= lastCheckedWatermark) {
+                if(minHeap.size() == partitionCount || (minHeap.peek() !=null && minHeap.peek().priority <= lastCheckedWatermark)) {
                     smallest = minHeap.remove();
                     queuePathIDCount[smallest.partitionNumber] = false;
                     ConcurrentLinkedQueue<kafkaMessage> q = smallest.q;
