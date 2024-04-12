@@ -28,7 +28,9 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,9 +42,10 @@ public class KafkaConsumerThread implements Runnable{
         String pattern = "(\\d+)-(\\d+)"; // detects things in the pattern %d-%d
         Pattern regex;
         Matcher matcher;
+        AtomicInteger watermark ;
 
 
-    public KafkaConsumerThread(String bootstrapServer , int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue) {
+    public KafkaConsumerThread(String bootstrapServer , int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue, AtomicInteger watermark) {
             this.partitionCount = partitionCount;
             Properties consumerProps = new Properties();
             consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer); // Replace with your Kafka broker addresses
@@ -53,6 +56,7 @@ public class KafkaConsumerThread implements Runnable{
             this.consumer.subscribe(Collections.singletonList("test_topic")); // Replace with your topic name
             this.partitionQueue = queue;
             this.regex = Pattern.compile(pattern);
+            this.watermark = watermark;
         }
         @Override
         public void run() {
@@ -77,6 +81,8 @@ public class KafkaConsumerThread implements Runnable{
             }
             close();
         }
+
+
         public void stopRunning() {
             running = false;
         }
