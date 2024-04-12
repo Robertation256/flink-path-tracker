@@ -53,7 +53,7 @@ public class KafkaConsumerThread implements Runnable{
             consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
             consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
             this.consumer = new KafkaConsumer<>(consumerProps);
-            this.consumer.subscribe(Collections.singletonList("test_topic")); // Replace with your topic name
+            this.consumer.subscribe(Collections.singletonList("test_topic")); // Need to update with partition topic
             this.partitionQueue = queue;
             this.regex = Pattern.compile(pattern);
             this.watermark = watermark;
@@ -65,16 +65,23 @@ public class KafkaConsumerThread implements Runnable{
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(
                         pollTimeMilli));
                 for (ConsumerRecord<String, String> record : records) {
-                    this.matcher = regex.matcher(record.value());
-                    if(matcher.matches()){
-                        int seqNum = Integer.parseInt(matcher.group(1));
-                        int value = Integer.parseInt(matcher.group(2));
-                        kafkaMessage message = new kafkaMessage(seqNum, value, System.currentTimeMillis());
-                        partitionQueue[record.partition()].offer(message);
-                    }
-                    else {
-                        System.out.println("data is not in correct format closing " + record.value());
-                        stopRunning();
+                    if (record.topic().equals("watermark_topic")) {
+                        watermark.set(Integer.parseInt(record.value())); // Assuming the value is the watermark
+                    } else {
+                        this.matcher = regex.matcher(record.value());
+                        if (matcher.matches()) {
+                            int seqNum = Integer.parseInt(matcher.group(1));
+                            int value = Integer.parseInt(matcher.group(2));
+                            kafkaMessage message = new kafkaMessage(
+                                    seqNum,
+                                    value,
+                                    System.currentTimeMillis());
+                            partitionQueue[record.partition()].offer(message);
+                        } else {
+                            System.out.println(
+                                    "data is not in correct format closing " + record.value());
+                            stopRunning();
+                        }
                     }
                 }
                 consumer.commitSync();
