@@ -24,6 +24,7 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.example.pipelines.ConfluxPipeline;
+import org.example.pipelines.GlobalSortPipeline;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 import java.util.Collections;
@@ -37,13 +38,19 @@ public class Main {
 
 
         String outputTopic = "test_topic";
+        runBaseline();
 
-        runConfluxWithKafkaContainer(outputTopic);
+//        runConfluxWithKafkaContainer(outputTopic);
 
-        // alternatively run with local kafka instance
+//        // alternatively run with local kafka instance
 //        String bootstrapServers = "localhost:9092";
 //        runConflux(bootstrapServers, outputTopic);
 
+    }
+
+    private static void runBaseline() throws Exception{
+        StreamExecutionEnvironment env = GlobalSortPipeline.create();
+        env.execute();
     }
 
 

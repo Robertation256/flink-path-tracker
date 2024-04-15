@@ -69,6 +69,6 @@ public class DecorateRecord<T> {
                 "{SeqNumber=%d, PathInfo=(%s), Value=%s}",
                 this.getSeqNum(),
                 this.getPathInfo(),
-                this.getValue());
+                this.getValue().toString());
     }
 }
