@@ -17,7 +17,7 @@
  */
 
 
-package org.example;
+package org.example.metric;
 
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;

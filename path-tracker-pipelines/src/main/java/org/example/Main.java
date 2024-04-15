@@ -18,29 +18,16 @@
 
 package org.example;
 
-import org.apache.flink.api.java.functions.KeySelector;
-import org.apache.flink.connector.base.DeliveryGuarantee;
-import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.apache.flink.streaming.api.environment.PathAnalyzer;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.example.datasource.DecorateRecord;
-import org.example.operator.TestRichFilterFunctionImpl;
-import org.example.operator.TestRichMapFunctionImplForMul2;
-import org.example.operator.TestRichMapFunctionImplForSquare;
 import org.example.pipelines.ConfluxPipeline;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
-
-import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Properties;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -93,7 +80,7 @@ public class Main {
 
         // Make producer, consumer, and merger
         KafkaMergeThread mergeThread = new KafkaMergeThread(pathNum, queue, watermarks);
-        KafkaConsumerThread consumeThread = new KafkaConsumerThread(bootstrapServers, pathNum, queue, watermarks);
+        KafkaConsumerThread consumeThread = new KafkaConsumerThread(kafkaBootstrapServers, pathNum, queue, watermarks);
 
         Thread merge = new Thread(mergeThread);
         Thread consume = new Thread(consumeThread);
