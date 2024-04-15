@@ -23,38 +23,39 @@ import java.util.Comparator;
 import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
-import org.jfree.chart.ChartFactory;
-import org.jfree.chart.ChartPanel;
-import org.jfree.chart.JFreeChart;
-import org.jfree.data.statistics.HistogramDataset;
 import javax.swing.*;
-import java.awt.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 public class KafkaMergeThread implements  Runnable {
         private volatile boolean running = true;
         private  static final int throughputIntervalMilli = 100;
         private final int partitionCount;
-        private ConcurrentLinkedQueue<kafkaMessage> partitionQueue [];
+        private final ConcurrentLinkedQueue<kafkaMessage> [] partitionQueue;
         PriorityQueue<minHeapTuple> minHeap;
         public ArrayList<Long> latencies;
         public ArrayList<Double> throughput;
+        AtomicInteger watermark;
+        int numEvents = 0;
+        long startTime;
+        boolean [] queuePathIDCount;
 
-    public KafkaMergeThread(int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue) {
+    public KafkaMergeThread(int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue, AtomicInteger watermark) {
             this.partitionCount = partitionCount;
             this.partitionQueue = queue;
             Comparator<minHeapTuple> tupleComparator = Comparator.comparingInt(t -> t.priority);
             this.minHeap = new PriorityQueue<>(tupleComparator);
             this.latencies = new ArrayList<>();
             this.throughput = new ArrayList<>();
+            this.watermark = watermark;
+            this.queuePathIDCount = new boolean[partitionCount];
     }
         @Override
         public void run() {
-            int waitTimeEmptyQueueMilli = 100;
+            int lastCheckedWatermark = 0;
             boolean foundEmptyQueue = false;
             boolean queueInitialized = false;
-            long startTime = System.currentTimeMillis();
-            int numEvents = 0;
+            startTime = System.currentTimeMillis();
 
             // Initial queue instantiation
             while(!queueInitialized) {
@@ -65,10 +66,12 @@ public class KafkaMergeThread implements  Runnable {
                     }
                 }
                 if(!foundEmptyQueue) {
-                    for (ConcurrentLinkedQueue<kafkaMessage> q : partitionQueue) {
+                    for (int queueIdx = 0; queueIdx < partitionCount; queueIdx++) {
+                        ConcurrentLinkedQueue<kafkaMessage> q = partitionQueue[queueIdx];
                         kafkaMessage temp = q.poll();
-                        minHeapTuple curr = new minHeapTuple(temp.seqNum, q, temp.arrivalTime);
+                        minHeapTuple curr = new minHeapTuple(temp.seqNum, q, temp.arrivalTime, queueIdx);
                         minHeap.add(curr);
+                        queuePathIDCount[queueIdx] = true; // a value from this queue is in the heap
                     }
                     queueInitialized = true;
                 }
@@ -76,37 +79,47 @@ public class KafkaMergeThread implements  Runnable {
             }
 
             while (running) {
-                // Pop smallest item
-                minHeapTuple smallest = minHeap.remove();
-                ConcurrentLinkedQueue<kafkaMessage> q = smallest.q;
-                int sequenceNum = smallest.priority;
-                long processingTime = System.currentTimeMillis() - smallest.createTime;
-
-                latencies.add(processingTime);
-                numEvents++;
-                long totalTime = (System.currentTimeMillis() - startTime) / 1000 ;
-                double throughput_curr = (double) numEvents / totalTime;
-                this.throughput.add(throughput_curr);
-
-//                System.out.print(sequenceNum + " "); // uncomment to verify correctness
-
-                // Keep polling that queue until there is a number in there
-                kafkaMessage nextNum = q.poll();
-                while(nextNum == null && running) {
-                    try {
-                        Thread.sleep(waitTimeEmptyQueueMilli);
-                    } catch (Exception e) {
-                        System.out.println("Some issue sleeping the cpu");
+                // Check if watermark has changed
+                // Try to refill all queues which don't have a value already in the heap
+                int currWatermark = watermark.get();
+                if(lastCheckedWatermark != currWatermark) {
+                    if(minHeap.size() != partitionCount) {
+                        for (int queueIdx = 0; queueIdx < partitionCount; queueIdx++) {
+                            if(!queuePathIDCount[queueIdx]) { // if a value is not currently in there for this queue
+                                ConcurrentLinkedQueue<kafkaMessage> q = partitionQueue[queueIdx];
+                                kafkaMessage nextNum = q.poll();
+                                if(nextNum != null) {
+                                    int nextNumUnpacked = nextNum.seqNum;
+                                    minHeapTuple curr = new minHeapTuple(nextNumUnpacked, q, nextNum.arrivalTime, queueIdx);
+                                    minHeap.add(curr);
+                                    queuePathIDCount[queueIdx] = true;
+                                }
+                            }
+                        }
                     }
-                    nextNum = q.poll();
+                    lastCheckedWatermark = currWatermark;
+                }
+                minHeapTuple smallest;
+
+                // if len(heap) == pathNum or heap.peek() < watermark
+                // Pop smallest item
+                if(minHeap.size() == partitionCount || (minHeap.peek() !=null && minHeap.peek().priority <= lastCheckedWatermark)) {
+                    smallest = minHeap.remove();
+                    queuePathIDCount[smallest.partitionNumber] = false;
+                    ConcurrentLinkedQueue<kafkaMessage> q = smallest.q;
+                    updateStatistics(smallest);
+
+                    // Try to refill if possible, if not move on
+                    kafkaMessage nextNum = q.poll();
+                    if(nextNum != null) {
+                        int nextNumUnpacked = nextNum.seqNum;
+                        minHeapTuple curr = new minHeapTuple(nextNumUnpacked, q, nextNum.arrivalTime, smallest.partitionNumber);
+                        minHeap.add(curr);
+                        queuePathIDCount[smallest.partitionNumber] = true;
+                    }
                 }
 
-                // Append the new value to the queue
-                if (running) {
-                    int nextNumUnpacked = nextNum.seqNum;
-                    minHeapTuple curr = new minHeapTuple(nextNumUnpacked, q, nextNum.arrivalTime);
-                    minHeap.add(curr);
-                }
+                // System.out.print(sequenceNum + " "); // uncomment to verify correctness
 
             }
         }
@@ -116,15 +129,25 @@ public class KafkaMergeThread implements  Runnable {
             System.out.println("Latency Values " + this.latencies.size());
             System.out.println("Throughput values: " + this.throughput.size());
         }
+        public void updateStatistics(minHeapTuple poppedValue) {
+            long processingTime = System.currentTimeMillis() - poppedValue.createTime;
+            latencies.add(processingTime);
+            numEvents++;
+            long totalTime = (System.currentTimeMillis() - startTime) / 1000 ;
+            double throughput_curr = (double) numEvents / totalTime;
+            this.throughput.add(throughput_curr);
+        }
 
     static class minHeapTuple{
         int priority;
         ConcurrentLinkedQueue<kafkaMessage> q;
         long createTime;
-        public minHeapTuple(int priority, ConcurrentLinkedQueue<kafkaMessage> queue, long time) {
+        int partitionNumber;
+        public minHeapTuple(int priority, ConcurrentLinkedQueue<kafkaMessage> queue, long time, int partitionNumber) {
             this.priority = priority;
-            this.q = queue;
+            this.q = queue; // No longer needed as we can just index into the queue list using partitionNumber but will leave for now
             this.createTime = time;
+            this.partitionNumber = partitionNumber;
             }
         }
     }
