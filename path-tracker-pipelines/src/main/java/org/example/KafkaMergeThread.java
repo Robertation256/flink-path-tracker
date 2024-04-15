@@ -23,12 +23,9 @@ import java.util.Comparator;
 import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
-import org.jfree.chart.ChartFactory;
-import org.jfree.chart.ChartPanel;
-import org.jfree.chart.JFreeChart;
-import org.jfree.data.statistics.HistogramDataset;
+import org.example.metric.HistogramExample;
+
 import javax.swing.*;
-import java.awt.*;
 
 
 public class KafkaMergeThread implements  Runnable {

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.example;
+package org.example.datasource;
 
 public class DecorateRecord<T> {
     private long seqNum;
