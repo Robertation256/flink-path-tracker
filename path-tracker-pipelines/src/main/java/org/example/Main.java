@@ -36,9 +36,13 @@ import org.example.pipelines.ConfluxPipeline;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Main {
 
@@ -85,13 +89,11 @@ public class Main {
         //todo: move K-way merger initialization to a separate start() function
 
         ConcurrentLinkedQueue<kafkaMessage>[] queue = new ConcurrentLinkedQueue[pathNum];
-        for(int i = 0; i < pathNum; i++) {
-            queue[i] = new ConcurrentLinkedQueue<>();
-        }
+        AtomicInteger watermarks = new AtomicInteger();
 
         // Make producer, consumer, and merger
-        KafkaMergeThread mergeThread = new KafkaMergeThread(pathNum, queue);
-        KafkaConsumerThread consumeThread = new KafkaConsumerThread(kafkaBootstrapServers, pathNum, queue);
+        KafkaMergeThread mergeThread = new KafkaMergeThread(pathNum, queue, watermarks);
+        KafkaConsumerThread consumeThread = new KafkaConsumerThread(bootstrapServers, pathNum, queue, watermarks);
 
         Thread merge = new Thread(mergeThread);
         Thread consume = new Thread(consumeThread);
