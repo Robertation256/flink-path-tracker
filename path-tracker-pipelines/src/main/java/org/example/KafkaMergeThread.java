@@ -82,7 +82,7 @@ public class KafkaMergeThread implements  Runnable {
                 // Check if watermark has changed
                 // Try to refill all queues which don't have a value already in the heap
                 int currWatermark = watermark.get();
-                if(lastCheckedWatermark != currWatermark) {
+                if(lastCheckedWatermark != currWatermark || minHeap.size() == 0) {
                     if(minHeap.size() != partitionCount) {
                         for (int queueIdx = 0; queueIdx < partitionCount; queueIdx++) {
                             if(!queuePathIDCount[queueIdx]) { // if a value is not currently in there for this queue

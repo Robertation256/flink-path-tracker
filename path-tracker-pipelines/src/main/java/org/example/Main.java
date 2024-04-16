@@ -83,8 +83,6 @@ public class Main {
         for (int i = 0; i < pathNum; i++) {
             queue[i] = new ConcurrentLinkedQueue<>();
         }
-
-
         AtomicInteger watermarks = new AtomicInteger();
 
         // Make producer, consumer, and merger
