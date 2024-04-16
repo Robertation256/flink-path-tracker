@@ -22,6 +22,7 @@ package org.example;
 import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
 
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.example.datasource.DecorateRecord;
 import org.testcontainers.shaded.org.bouncycastle.util.Strings;
 
 

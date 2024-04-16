@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.example;
+package org.example.datasource;
 
 public class DecorateRecord<T> {
     private long seqNum;
@@ -69,6 +69,6 @@ public class DecorateRecord<T> {
                 "{SeqNumber=%d, PathInfo=(%s), Value=%s}",
                 this.getSeqNum(),
                 this.getPathInfo(),
-                this.getValue());
+                this.getValue().toString());
     }
 }

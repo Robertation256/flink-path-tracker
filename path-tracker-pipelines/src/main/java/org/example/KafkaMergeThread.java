@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import javax.swing.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.example.metric.HistogramExample;
 
 
 public class KafkaMergeThread implements  Runnable {
