@@ -103,10 +103,10 @@ public class KafkaMergeThread implements  Runnable {
                     lastCheckedWatermark = currWatermark;
                 }
                 minHeapTuple smallest;
-
                 // if len(heap) == pathNum or heap.peek() < watermark
                 // Pop smallest item
                 if(minHeap.size() == partitionCount || (minHeap.peek() !=null && minHeap.peek().priority <= lastCheckedWatermark)) {
+                    System.out.println("Popping value");
                     smallest = minHeap.remove();
                     queuePathIDCount[smallest.partitionNumber] = false;
                     ConcurrentLinkedQueue<kafkaMessage> q = smallest.q;
