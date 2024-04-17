@@ -43,8 +43,8 @@ public class Main {
 //        runConfluxWithKafkaContainer(outputTopic);
 
 //        // alternatively run with local kafka instance
-//        String bootstrapServers = "localhost:9092";
-//        runConflux(bootstrapServers, outputTopic);
+        String bootstrapServers = "localhost:9092";
+        runConflux(bootstrapServers, outputTopic);
 
     }
 

@@ -83,7 +83,7 @@ public class KafkaMergeThread implements  Runnable {
                 // Check if watermark has changed
                 // Try to refill all queues which don't have a value already in the heap
                 int currWatermark = watermark.get();
-                if(lastCheckedWatermark != currWatermark) {
+                if(lastCheckedWatermark != currWatermark || minHeap.size() == 0) {
                     if(minHeap.size() != partitionCount) {
                         for (int queueIdx = 0; queueIdx < partitionCount; queueIdx++) {
                             if(!queuePathIDCount[queueIdx]) { // if a value is not currently in there for this queue
@@ -101,10 +101,10 @@ public class KafkaMergeThread implements  Runnable {
                     lastCheckedWatermark = currWatermark;
                 }
                 minHeapTuple smallest;
-
                 // if len(heap) == pathNum or heap.peek() < watermark
                 // Pop smallest item
                 if(minHeap.size() == partitionCount || (minHeap.peek() !=null && minHeap.peek().priority <= lastCheckedWatermark)) {
+                    System.out.println("Popping value");
                     smallest = minHeap.remove();
                     queuePathIDCount[smallest.partitionNumber] = false;
                     ConcurrentLinkedQueue<kafkaMessage> q = smallest.q;
