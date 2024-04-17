@@ -19,9 +19,9 @@
 package org.example;
 
 public class kafkaMessage {
-    int seqNum, value;
+    long seqNum, value;
     long arrivalTime;
-    public kafkaMessage(int seqNum, int value, long time) {
+    public kafkaMessage(long seqNum, long value, long time) {
         this.seqNum = seqNum;
         this.value = value;
         this.arrivalTime = time;

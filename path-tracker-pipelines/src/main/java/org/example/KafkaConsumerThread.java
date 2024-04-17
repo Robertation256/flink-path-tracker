@@ -31,6 +31,7 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,10 +43,10 @@ public class KafkaConsumerThread implements Runnable{
         String pattern = "(\\d+)-(\\d+)"; // detects things in the pattern %d-%d
         Pattern regex;
         Matcher matcher;
-        AtomicInteger watermark ;
+        AtomicLong watermark;
 
 
-    public KafkaConsumerThread(String bootstrapServer , int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue, AtomicInteger watermark) {
+    public KafkaConsumerThread(String bootstrapServer , int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue, AtomicLong watermark) {
             this.partitionCount = partitionCount;
             Properties consumerProps = new Properties();
             consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer); // Replace with your Kafka broker addresses
@@ -66,12 +67,12 @@ public class KafkaConsumerThread implements Runnable{
                         pollTimeMilli));
                 for (ConsumerRecord<String, String> record : records) {
                     if (record.topic().equals("watermark_topic")) {
-                        watermark.set(Integer.parseInt(record.value())); // Assuming the value is the watermark
+                        watermark.set(Long.parseLong(record.value())); // Assuming the value is the watermark
                     } else {
                         this.matcher = regex.matcher(record.value());
                         if (matcher.matches()) {
-                            int seqNum = Integer.parseInt(matcher.group(1));
-                            int value = Integer.parseInt(matcher.group(2));
+                            long seqNum = Long.parseLong(matcher.group(1));
+                            long value = Long.parseLong(matcher.group(2));
                             kafkaMessage message = new kafkaMessage(
                                     seqNum,
                                     value,

@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class Main {
 
@@ -43,8 +44,8 @@ public class Main {
 //        runConfluxWithKafkaContainer(outputTopic);
 
 //        // alternatively run with local kafka instance
-//        String bootstrapServers = "localhost:9092";
-//        runConflux(bootstrapServers, outputTopic);
+        String bootstrapServers = "localhost:9092";
+        runConflux(bootstrapServers, outputTopic);
 
     }
 
@@ -88,7 +89,7 @@ public class Main {
         }
 
 
-        AtomicInteger watermarks = new AtomicInteger();
+        AtomicLong watermarks = new AtomicLong();
 
         // Make producer, consumer, and merger
         KafkaMergeThread mergeThread = new KafkaMergeThread(pathNum, queue, watermarks);
