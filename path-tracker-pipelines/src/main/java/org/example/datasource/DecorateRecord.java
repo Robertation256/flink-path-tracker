@@ -24,10 +24,19 @@ public class DecorateRecord<T> {
 
     private T value;
 
+    private final boolean isDummyWatermark;
+
     public DecorateRecord(long SeqNum, String pathInfo, T value) {
         this.seqNum = SeqNum;
         this.pathInfo = pathInfo;
         this.value = value;
+        this.isDummyWatermark = false;
+    }
+
+    public DecorateRecord(long SeqNum, boolean isDummyWatermark) {
+        this.seqNum = SeqNum;
+        this.pathInfo = "";
+        this.isDummyWatermark = isDummyWatermark;
     }
 
     public void setSeqNum(long seqNum) {
@@ -63,12 +72,16 @@ public class DecorateRecord<T> {
         return value;
     }
 
+    public boolean isDummyWatermark() {
+        return this.isDummyWatermark;
+    }
+
     @Override
     public String toString() {
         return String.format(
                 "{SeqNumber=%d, PathInfo=(%s), Value=%s}",
                 this.getSeqNum(),
                 this.getPathInfo(),
-                this.getValue().toString());
+                this.getValue());
     }
 }
