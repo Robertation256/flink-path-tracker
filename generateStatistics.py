@@ -22,6 +22,13 @@ def parse_data(filename):
     return normalizedData
 
 
+def plot_histogram(values, title):
+    plt.hist(values, bins=15, edgecolor="black")
+    plt.xlabel("Value")
+    plt.ylabel("Frequency")
+    plt.title(title)
+    plt.grid(True)
+    plt.show()
 
 
 def plot_bar_chart(data, title):
@@ -41,7 +48,9 @@ def make_statistics(values):
     percentile_99 = np.percentile(values, 99)
 
     # Create a bar chart
-    print(f"Mean: {mean_value} Std Dev: {std_dev} Variance: {variance} 99th Percentile: {percentile_99}")
+    print(
+        f"Mean: {mean_value} Std Dev: {std_dev} Variance: {variance} 99th Percentile: {percentile_99}"
+    )
 
 
 latency_data = parse_data("latency.txt")
@@ -53,8 +62,8 @@ throughout_no_timestamp = [x[1] for x in throughput_data]
 make_statistics(latency_no_timestamp)
 make_statistics(throughout_no_timestamp)
 
+plot_histogram(latency_no_timestamp, "Latency Histogram")
+plot_histogram(throughout_no_timestamp, "Throughput Histogram")
 
 plot_bar_chart(latency_data, "Latency Data")
 plot_bar_chart(throughput_data, "Throughput Data")
-
-
