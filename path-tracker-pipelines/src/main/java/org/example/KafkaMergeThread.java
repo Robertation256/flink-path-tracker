@@ -18,8 +18,13 @@
 
 package org.example;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
@@ -36,8 +41,8 @@ public class KafkaMergeThread implements  Runnable {
         private final int partitionCount;
         private final ConcurrentLinkedQueue<kafkaMessage> [] partitionQueue;
         PriorityQueue<minHeapTuple> minHeap;
-        public ArrayList<Long> latencies;
-        public ArrayList<Double> throughput;
+        Map<Long, Long> latencies ;
+        Map<Long, Double> throughput;
         AtomicLong watermark;
         int numEvents = 0;
         long startTime;
@@ -48,8 +53,8 @@ public class KafkaMergeThread implements  Runnable {
             this.partitionQueue = queue;
             Comparator<minHeapTuple> tupleComparator = Comparator.comparingLong(t -> t.priority);
             this.minHeap = new PriorityQueue<>(tupleComparator);
-            this.latencies = new ArrayList<>();
-            this.throughput = new ArrayList<>();
+            this.latencies = new HashMap<>();
+            this.throughput = new HashMap<>();
             this.watermark = watermark;
             this.queuePathIDCount = new boolean[partitionCount];
     }
@@ -106,7 +111,6 @@ public class KafkaMergeThread implements  Runnable {
                 // if len(heap) == pathNum or heap.peek() < watermark
                 // Pop smallest item
                 if(minHeap.size() == partitionCount || (minHeap.peek() !=null && minHeap.peek().priority <= lastCheckedWatermark)) {
-                    System.out.println("Popping value");
                     smallest = minHeap.remove();
                     queuePathIDCount[smallest.partitionNumber] = false;
                     ConcurrentLinkedQueue<kafkaMessage> q = smallest.q;
@@ -120,6 +124,8 @@ public class KafkaMergeThread implements  Runnable {
                         minHeap.add(curr);
                         queuePathIDCount[smallest.partitionNumber] = true;
                     }
+                } else {
+//                    System.out.println("Not able to pop condition 1: " + (minHeap.size() == partitionCount) + " Condition 2: " +  (minHeap.peek() !=null && minHeap.peek().priority <= lastCheckedWatermark));
                 }
 
                 // System.out.print(sequenceNum + " "); // uncomment to verify correctness
@@ -128,17 +134,18 @@ public class KafkaMergeThread implements  Runnable {
         }
         public void stopRunning() {
             running = false;
-            statistics.getDescriptiveStats(latencies, throughput);
-            System.out.println("Latency Values " + this.latencies.size());
-            System.out.println("Throughput values: " + this.throughput.size());
+            statistics.uploadToFile("latency.txt", latencies);
+            statistics.uploadToFile("throughput.txt", throughput);
+            System.out.println("Number of latency values " + this.latencies.size());
+            System.out.println("Number of throughput values: " + this.throughput.size());
         }
         public void updateStatistics(minHeapTuple poppedValue) {
             long processingTime = System.currentTimeMillis() - poppedValue.createTime;
-            latencies.add(processingTime);
+            this.latencies.put(System.currentTimeMillis(), processingTime);
             numEvents++;
             long totalTime = (System.currentTimeMillis() - startTime) / 1000 ;
             double throughput_curr = (double) numEvents / totalTime;
-            this.throughput.add(throughput_curr);
+            this.throughput.put(System.currentTimeMillis(),throughput_curr);
         }
 
     static class minHeapTuple{
@@ -156,47 +163,25 @@ public class KafkaMergeThread implements  Runnable {
     }
 
     class statistics {
-        public static void getDescriptiveStats(ArrayList<Long> latency, ArrayList<Double> throughput)    {
-            long [] latencyArray = new long[latency.size()];
-            double [] throughputArray = new double[throughput.size()];
+        public static void uploadToFile(String filename, Map<Long, ?> data) {
+            try {
+                File file = new File(filename);
+                if (!file.exists()) {
+                    file.createNewFile();
+                }
 
-            DescriptiveStatistics throughputStats = new DescriptiveStatistics();
-            for(int i = 0; i < throughput.size(); i++) {
-                throughputStats.addValue(throughput.get((i)));
-                throughputArray[i] = throughput.get(i);
+                try (FileWriter writer = new FileWriter(filename)) {
+                    // Write header
+                    writer.write("Timestamp,Value\n");
+
+                    // Write data to file
+                    for (Map.Entry<Long, ?> entry : data.entrySet()) {
+                        writer.write(entry.getKey() + "," + entry.getValue() + "\n");
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            DescriptiveStatistics latencyStats = new DescriptiveStatistics();
-
-            for(int i = 0; i < latency.size(); i++) {
-                latencyStats.addValue(latency.get((i)));
-                latencyArray[i] = latency.get(i);
-            }
-
-            System.out.println("Throughput Mean: " + throughputStats.getMean());
-            System.out.println("Throughput Standard Deviation: " + throughputStats.getStandardDeviation());
-            System.out.println("Throughput Variance: " + throughputStats.getVariance());
-
-            System.out.println("Latency Mean: " + latencyStats.getMean());
-            System.out.println("Latency Standard Deviation: " + latencyStats.getStandardDeviation());
-            System.out.println("Latency Variance: " + latencyStats.getVariance());
-
-            int numberOfBins = 20; // Number of bins for histogram
-
-            // Create and display the histogram
-            SwingUtilities.invokeLater(() -> {
-                HistogramExample example = new HistogramExample("Conflux throughput", throughputArray, numberOfBins, 16);
-                example.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-                example.pack();
-                example.setVisible(true);
-            });
-
-            SwingUtilities.invokeLater(() -> {
-                HistogramExample example = new HistogramExample("Conflux per record latency", latencyArray, numberOfBins, 25);
-                example.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-                example.pack();
-                example.setVisible(true);
-            });
-
         }
 }
 

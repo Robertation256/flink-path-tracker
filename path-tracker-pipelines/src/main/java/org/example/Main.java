@@ -77,6 +77,7 @@ public class Main {
             adminClient.createTopics(Collections.singleton(newTopic)).all().get();
             System.out.println("Topic created successfully");
         } catch (Exception e) {
+            System.out.println("Topic probbably exists");
             e.printStackTrace();
         }
 
