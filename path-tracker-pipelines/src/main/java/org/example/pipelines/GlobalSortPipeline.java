@@ -57,7 +57,6 @@ public class GlobalSortPipeline {
                 process(getCheckerFunction()).setParallelism(1)
                 .print().setParallelism(1);
 
-
         return env;
     }
 
