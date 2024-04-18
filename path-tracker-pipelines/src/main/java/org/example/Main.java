@@ -73,7 +73,7 @@ public class Main {
         prop.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServers);
 
         try (AdminClient adminClient = AdminClient.create(prop)) {
-            NewTopic newTopic = new NewTopic(kafkaBootstrapServers, pathNum, (short) 1);
+            NewTopic newTopic = new NewTopic(outputTopic, pathNum, (short) 1);
             adminClient.createTopics(Collections.singleton(newTopic)).all().get();
             System.out.println("Topic created successfully");
         } catch (Exception e) {
