@@ -55,17 +55,16 @@ public class Main {
     }
 
 
-    private static void runConfluxWithKafkaContainer(String outputTopic) throws Exception {
+    private static void runConfluxWithKafkaContainer(String outputTopic, String watermarkOutputTopic) throws Exception {
         KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:6.2.1"));
         kafka.start();
-        runConflux(kafka.getBootstrapServers(), outputTopic);
-
+        runConflux(kafka.getBootstrapServers(), outputTopic, watermarkOutputTopic);
     }
 
 
-    private static void runConflux(String kafkaBootstrapServers, String outputTopic) throws Exception{
+    private static void runConflux(String kafkaBootstrapServers, String outputTopic, String watermarkOutputTopic) throws Exception{
 
-        StreamExecutionEnvironment env = ConfluxPipeline.create(kafkaBootstrapServers, outputTopic);
+        StreamExecutionEnvironment env = ConfluxPipeline.create(kafkaBootstrapServers, outputTopic, watermarkOutputTopic);
         int pathNum = PathAnalyzer.computePathNum(env);
 
 
