@@ -87,7 +87,11 @@ public class KafkaConsumerThread implements Runnable{
         }
 
         public void updateWatermark(long watermarkValue, int pathID) {
-            watermarks.put(pathID, watermarkValue);
+            if(watermarks.get(pathID) < watermarkValue) {
+                System.out.println(
+                        "For path: " + pathID + " Updating watermark to " + watermarkValue);
+                watermarks.put(pathID, watermarkValue);
+            }
         }
 
         public void stopRunning() {

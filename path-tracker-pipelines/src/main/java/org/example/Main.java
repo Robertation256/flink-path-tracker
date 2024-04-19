@@ -42,7 +42,7 @@ public class Main {
         String outputTopic = "test_topic";
         // runBaseline();
 
-        // runConfluxWithKafkaContainer(outputTopic);
+//         runConfluxWithKafkaContainer(outputTopic);
 
         // alternatively run with local kafka instance
         String bootstrapServers = "localhost:9092";
@@ -96,7 +96,6 @@ public class Main {
 
         try {
             env.execute();
-
             Thread.sleep(10000);
         } catch (Exception e) {
             e.printStackTrace();

@@ -50,7 +50,7 @@ public class CustomKafkaSerializer implements
 
 
 
-        LOG.info(String.format("Emitting record %s", element));
+//        LOG.info(String.format("Emitting record %s", element));
 
 
         if (element.getQueueId() < 0){

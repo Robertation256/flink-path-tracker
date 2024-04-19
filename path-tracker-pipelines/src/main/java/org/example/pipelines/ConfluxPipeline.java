@@ -48,7 +48,7 @@ public class ConfluxPipeline {
         WatermarkStrategy<DecorateRecord> customWatermarkStrategy = new CustomWatermarkStrategy<>();
 
         DataStream<DecorateRecord> datasource = env
-                .addSource(new TestDataSource(1000)).setParallelism(1)
+                .addSource(new TestDataSource(100000)).setParallelism(1)
                 .assignTimestampsAndWatermarks(customWatermarkStrategy).setParallelism(1);
         DataStream<DecorateRecord> recordStream = Workload.attachTestPipeline(datasource);
 
