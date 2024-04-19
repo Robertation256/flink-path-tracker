@@ -30,6 +30,7 @@ import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 import java.util.Collections;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -39,13 +40,13 @@ public class Main {
 
 
         String outputTopic = "test_topic";
-//        runBaseline();
+        // runBaseline();
 
-        runConfluxWithKafkaContainer(outputTopic);
+        // runConfluxWithKafkaContainer(outputTopic);
 
-//        // alternatively run with local kafka instance
-//        String bootstrapServers = "localhost:9092";
-//        runConflux(bootstrapServers, outputTopic);
+        // alternatively run with local kafka instance
+        String bootstrapServers = "localhost:9092";
+        runConflux(bootstrapServers, outputTopic);
 
     }
 
@@ -78,8 +79,7 @@ public class Main {
         }
 
 
-        AtomicLong watermarks = new AtomicLong();
-
+        ConcurrentHashMap<Integer, Long> watermarks = new ConcurrentHashMap<>();
 
         // Make producer, consumer, and merger
         KafkaMergeThread mergeThread = new KafkaMergeThread(pathNum, queue, watermarks);
