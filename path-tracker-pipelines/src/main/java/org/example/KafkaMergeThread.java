@@ -24,18 +24,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
-import javax.swing.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-
-import org.example.metric.HistogramExample;
 
 
 public class KafkaMergeThread implements  Runnable {
@@ -44,8 +36,6 @@ public class KafkaMergeThread implements  Runnable {
         private final int partitionCount;
         private final ConcurrentLinkedQueue<kafkaMessage> [] partitionQueue;
         PriorityQueue<minHeapTuple> minHeap;
-//        Map<Long, Long> latencies ;
-//        Map<Long, Double> throughput;
         List<Tuple<Long, Long>> latencies;
         List<Tuple<Long, Double>> throughput;
 
@@ -54,6 +44,8 @@ public class KafkaMergeThread implements  Runnable {
         boolean [] queuePathIDCount;
         ConcurrentHashMap<Integer, Long> watermarks;
         long valuesPopped = 0;
+        long lastSeqNum = 0;
+
 
     public KafkaMergeThread(int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue, ConcurrentHashMap<Integer, Long> watermarks) {
             this.partitionCount = partitionCount;
@@ -149,19 +141,30 @@ public class KafkaMergeThread implements  Runnable {
         public void emitRecord() {
             minHeapTuple smallest;
             smallest = minHeap.remove();
-            queuePathIDCount[smallest.partitionNumber] = false;
-            ConcurrentLinkedQueue<kafkaMessage> q = smallest.q;
-            updateStatistics(smallest);
-            valuesPopped++;
-
-            // Try to refill if possible, if not move on
-            kafkaMessage nextNum = q.poll();
-            if(nextNum != null) {
-                long nextNumUnpacked = nextNum.seqNum;
-                minHeapTuple curr = new minHeapTuple(nextNumUnpacked, q, nextNum.arrivalTime, smallest.partitionNumber);
-                minHeap.add(curr);
-                queuePathIDCount[smallest.partitionNumber] = true;
+            if (lastSeqNum > smallest.priority) {
+                System.out.println("Safety Violation \n\n\n\n\n\n  " + "Last seq Number:" + lastSeqNum + " Curr Seq Number " + smallest.priority);
+                stopRunning();
+            } else {
+                lastSeqNum = smallest.priority;
             }
+
+             queuePathIDCount[smallest.partitionNumber] = false;
+             ConcurrentLinkedQueue<kafkaMessage> q = smallest.q;
+             updateStatistics(smallest);
+             valuesPopped++;
+
+                // Try to refill if possible, if not move on
+                kafkaMessage nextNum = q.poll();
+                if (nextNum != null) {
+                    long nextNumUnpacked = nextNum.seqNum;
+                    minHeapTuple curr = new minHeapTuple(
+                            nextNumUnpacked,
+                            q,
+                            nextNum.arrivalTime,
+                            smallest.partitionNumber);
+                    minHeap.add(curr);
+                    queuePathIDCount[smallest.partitionNumber] = true;
+                }
         }
 
         public void updateStatistics(minHeapTuple poppedValue) {
