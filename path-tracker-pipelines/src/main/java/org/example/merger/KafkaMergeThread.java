@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.example;
+package org.example.merger;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -32,7 +32,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class KafkaMergeThread implements  Runnable {
         private volatile boolean running = true;
-        private  static final int throughputIntervalMilli = 100;
         private final int partitionCount;
         private final ConcurrentLinkedQueue<kafkaMessage> [] partitionQueue;
         PriorityQueue<minHeapTuple> minHeap;
@@ -138,7 +137,7 @@ public class KafkaMergeThread implements  Runnable {
             minHeapTuple smallest;
             smallest = minHeap.remove();
             if (lastSeqNum > smallest.priority) {
-                System.out.println("========= \n Safety Violation \n ========== " + "Last seq Number: " + lastSeqNum + " Curr Seq Number " + smallest.priority);
+                System.out.println("=========\nSafety Violation\n========== \n" + "Last seq Number: " + lastSeqNum + " Curr Seq Number " + smallest.priority);
                 stopRunning();
             } else {
                 lastSeqNum = smallest.priority;

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.example;
+package org.example.merger;
 
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
