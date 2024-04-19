@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -43,8 +44,11 @@ public class KafkaMergeThread implements  Runnable {
         private final int partitionCount;
         private final ConcurrentLinkedQueue<kafkaMessage> [] partitionQueue;
         PriorityQueue<minHeapTuple> minHeap;
-        Map<Long, Long> latencies ;
-        Map<Long, Double> throughput;
+//        Map<Long, Long> latencies ;
+//        Map<Long, Double> throughput;
+        List<Tuple<Long, Long>> latencies;
+        List<Tuple<Long, Double>> throughput;
+
         int numEvents = 0;
         long startTime;
         boolean [] queuePathIDCount;
@@ -56,8 +60,8 @@ public class KafkaMergeThread implements  Runnable {
             this.partitionQueue = queue;
             Comparator<minHeapTuple> tupleComparator = Comparator.comparingLong(t -> t.priority);
             this.minHeap = new PriorityQueue<>(tupleComparator);
-            this.latencies = new HashMap<>();
-            this.throughput = new HashMap<>();
+            this.latencies = new ArrayList<>();
+            this.throughput = new ArrayList<>();
             this.watermarks = watermarks;
             this.queuePathIDCount = new boolean[partitionCount];
     }
@@ -136,8 +140,8 @@ public class KafkaMergeThread implements  Runnable {
         }
         public void stopRunning() {
             running = false;
-            statistics.uploadToFile("latency.txt", latencies);
-            statistics.uploadToFile("throughput.txt", throughput);
+            statistics.uploadLatencyToFile("latency.txt", latencies);
+            statistics.uploadThroughputToFile("throughput.txt", throughput);
             System.out.println("Number of values popped " + valuesPopped) ;
 
         }
@@ -162,11 +166,11 @@ public class KafkaMergeThread implements  Runnable {
 
         public void updateStatistics(minHeapTuple poppedValue) {
             long processingTime = System.currentTimeMillis() - poppedValue.createTime;
-            this.latencies.put(System.currentTimeMillis(), processingTime);
+            this.latencies.add(new Tuple<>(System.currentTimeMillis(), processingTime)) ;
             numEvents++;
             long totalTime = (System.currentTimeMillis() - startTime) / 1000 ;
             double throughput_curr = (double) numEvents / totalTime;
-            this.throughput.put(System.currentTimeMillis(),throughput_curr);
+            this.throughput.add(new Tuple<>(System.currentTimeMillis(),throughput_curr));
         }
 
         public long getSmallestWatermark() {
@@ -185,10 +189,21 @@ public class KafkaMergeThread implements  Runnable {
             this.partitionNumber = partitionNumber;
             }
         }
+
+    public static class Tuple<K, V> {
+        K first;
+        V second;
+
+        public Tuple(K first, V second) {
+            this.first = first;
+            this.second = second;
+        }
+    }
     }
 
+
     class statistics {
-        public static void uploadToFile(String filename, Map<Long, ?> data) {
+        public static void uploadThroughputToFile(String filename, List<KafkaMergeThread.Tuple<Long, Double>> data) {
             try {
                 File file = new File(filename);
                 if (!file.exists()) {
@@ -200,14 +215,36 @@ public class KafkaMergeThread implements  Runnable {
                     writer.write("Timestamp,Value\n");
 
                     // Write data to file
-                    for (Map.Entry<Long, ?> entry : data.entrySet()) {
-                        writer.write(entry.getKey() + "," + entry.getValue() + "\n");
+                    for (KafkaMergeThread.Tuple<Long, ?> tuple : data) {
+                        writer.write(tuple.first + "," + tuple.second + "\n");
                     }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
+
+        public static void uploadLatencyToFile(String filename, List<KafkaMergeThread.Tuple<Long, Long>> data) {
+            try {
+                File file = new File(filename);
+                if (!file.exists()) {
+                    file.createNewFile();
+                }
+
+                try (FileWriter writer = new FileWriter(filename)) {
+                    // Write header
+                    writer.write("Timestamp,Value\n");
+
+                    // Write data to file
+                    for (KafkaMergeThread.Tuple<Long, ?> tuple : data) {
+                        writer.write(tuple.first + "," + tuple.second + "\n");
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
 }
 
 
