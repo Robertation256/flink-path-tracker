@@ -59,7 +59,48 @@ public class KafkaMergeThread implements  Runnable {
     }
         @Override
         public void run() {
+            init_heap(); // Push one value from each path onto the heap
             long lastCheckedWatermark = 0;
+
+            while (running) {
+                // Check if watermark has changed
+                long currWatermark = getSmallestWatermark();
+                if((lastCheckedWatermark != currWatermark) || (minHeap.size() == 0)) {
+                    if (lastCheckedWatermark != currWatermark) {
+                        System.out.println("Smallest watermark: " + currWatermark + "  last checked watermark: " + lastCheckedWatermark);
+                    }
+                    refillHeap(); // Fill up heap with one value from every queue if it exists
+                    lastCheckedWatermark = currWatermark;
+                }
+
+                // if len(heap) == pathNum or heap.peek() < watermark
+                // Pop smallest item
+                if((minHeap.size() == partitionCount)) {
+                   emitRecord();
+                } else if ((minHeap.peek() !=null) && (minHeap.peek().priority <= lastCheckedWatermark)) {
+                  emitRecord();
+                }
+            }
+        }
+
+        public void refillHeap() {
+            if(minHeap.size() != partitionCount) {
+                for (int queueIdx = 0; queueIdx < partitionCount; queueIdx++) {
+                    if(!queuePathIDCount[queueIdx]) { // if a value is not currently in there for this queue
+                        ConcurrentLinkedQueue<kafkaMessage> q = partitionQueue[queueIdx];
+                        kafkaMessage nextNum = q.poll();
+                        if(nextNum != null) {
+                            long nextNumUnpacked = nextNum.seqNum;
+                            minHeapTuple curr = new minHeapTuple(nextNumUnpacked, q, nextNum.arrivalTime, queueIdx);
+                            minHeap.add(curr);
+                            queuePathIDCount[queueIdx] = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        public void init_heap() {
             boolean foundEmptyQueue = false;
             boolean queueInitialized = false;
             startTime = System.currentTimeMillis();
@@ -84,65 +125,20 @@ public class KafkaMergeThread implements  Runnable {
                 }
                 foundEmptyQueue = false;
             }
-
-            while (running) {
-                // Check if watermark has changed
-                // Try to refill all queues which don't have a value already in the heap
-                long currWatermark = getSmallestWatermark();
-                if(lastCheckedWatermark != currWatermark || minHeap.size() == 0) {
-                    if (lastCheckedWatermark != currWatermark) {
-                        System.out.println(
-                                "Smallest watermark: " + currWatermark + "  last checked watermark: "
-                                        + lastCheckedWatermark);
-                    }
-                    if(minHeap.size() != partitionCount) {
-                        for (int queueIdx = 0; queueIdx < partitionCount; queueIdx++) {
-                            if(!queuePathIDCount[queueIdx]) { // if a value is not currently in there for this queue
-                                ConcurrentLinkedQueue<kafkaMessage> q = partitionQueue[queueIdx];
-                                kafkaMessage nextNum = q.poll();
-                                if(nextNum != null) {
-                                    long nextNumUnpacked = nextNum.seqNum;
-                                    minHeapTuple curr = new minHeapTuple(nextNumUnpacked, q, nextNum.arrivalTime, queueIdx);
-                                    minHeap.add(curr);
-                                    queuePathIDCount[queueIdx] = true;
-                                }
-                            }
-                        }
-                    }
-                    lastCheckedWatermark = currWatermark;
-                }
-
-                // if len(heap) == pathNum or heap.peek() < watermark
-                // Pop smallest item
-                if((minHeap.size() == partitionCount)) {
-                   emitRecord();
-                } else if ((minHeap.peek() !=null) && (minHeap.peek().priority <= lastCheckedWatermark)) {
-                  emitRecord();
-                } else {
-                    // Uncomment for debugging
-//                    minHeapTuple curr = minHeap.peek();
-//                    if (curr != null) {
-//                        System.out.println("Could not pop " + curr.priority + " with watermark " + lastCheckedWatermark);
-//                    }
-                }
-
-                // System.out.print(sequenceNum + " "); // uncomment to verify correctness
-
-            }
         }
+
         public void stopRunning() {
             running = false;
             statistics.uploadLatencyToFile("latency.txt", latencies);
             statistics.uploadThroughputToFile("throughput.txt", throughput);
             System.out.println("Number of values popped " + valuesPopped) ;
-
         }
 
         public void emitRecord() {
             minHeapTuple smallest;
             smallest = minHeap.remove();
             if (lastSeqNum > smallest.priority) {
-                System.out.println("Safety Violation \n\n\n\n\n\n  " + "Last seq Number:" + lastSeqNum + " Curr Seq Number " + smallest.priority);
+                System.out.println("========= \n Safety Violation \n ========== " + "Last seq Number: " + lastSeqNum + " Curr Seq Number " + smallest.priority);
                 stopRunning();
             } else {
                 lastSeqNum = smallest.priority;

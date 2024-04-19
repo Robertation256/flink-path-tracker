@@ -38,18 +38,20 @@ public class KafkaConsumerThread implements Runnable{
         private volatile boolean running = true;
         private int partitionCount;
         Consumer<String, String> consumer;
-        private ConcurrentLinkedQueue<kafkaMessage> partitionQueue [];
+        private final ConcurrentLinkedQueue<kafkaMessage> [] partitionQueue;
         ConcurrentHashMap<Integer, Long> watermarks;
         long recordsReceived = 0;
+
+
     public KafkaConsumerThread(String bootstrapServer , int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue,  ConcurrentHashMap<Integer, Long> watermarks) {
             this.partitionCount = partitionCount;
             Properties consumerProps = new Properties();
-            consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer); // Replace with your Kafka broker addresses
-            consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "test_group_id"); // Consumer group ID
+            consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
+            consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "test_group_id");
             consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
             consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
             this.consumer = new KafkaConsumer<>(consumerProps);
-            this.consumer.subscribe(Collections.singletonList("test_topic")); // Need to update with watermark topic
+            this.consumer.subscribe(Collections.singletonList("test_topic"));
             this.partitionQueue = queue;
             this.watermarks = watermarks;
 
@@ -61,8 +63,7 @@ public class KafkaConsumerThread implements Runnable{
         public void run() {
             while (running) {
                 int pollTimeMilli = 100;
-                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(
-                        pollTimeMilli));
+                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(pollTimeMilli));
                 for (ConsumerRecord<String, String> record : records) {
                     byte[] record_val = record.value().getBytes(StandardCharsets.UTF_8);
                     DecorateRecord curr_record = RecordSerdes.fromBytes(record_val);
@@ -75,7 +76,7 @@ public class KafkaConsumerThread implements Runnable{
                                 1,
                                 System.currentTimeMillis());
                         partitionQueue[record.partition()].offer(message);
-                        }
+                    }
                     }
                 consumer.commitSync();
                 }
