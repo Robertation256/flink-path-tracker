@@ -80,6 +80,7 @@ public class Main {
 
         AtomicLong watermarks = new AtomicLong();
 
+
         // Make producer, consumer, and merger
         KafkaMergeThread mergeThread = new KafkaMergeThread(pathNum, queue, watermarks);
         KafkaConsumerThread consumeThread = new KafkaConsumerThread(kafkaBootstrapServers, pathNum, queue, watermarks);

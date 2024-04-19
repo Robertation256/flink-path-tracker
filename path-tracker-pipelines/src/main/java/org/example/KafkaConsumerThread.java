@@ -18,13 +18,17 @@
 
 package org.example;
 
+import com.fasterxml.jackson.databind.ObjectReader;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.example.datasource.DecorateRecord;
+import org.example.utils.RecordSerdes;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Properties;
@@ -40,13 +44,9 @@ public class KafkaConsumerThread implements Runnable{
         private int partitionCount;
         Consumer<String, String> consumer;
         private ConcurrentLinkedQueue<kafkaMessage> partitionQueue [];
-        String pattern = "(\\d+)-(\\d+)"; // detects things in the pattern %d-%d
-        Pattern regex;
-        Matcher matcher;
-        AtomicLong watermark;
+        ConcurrentHashMap<Integer, Long> watermarks;
 
-
-    public KafkaConsumerThread(String bootstrapServer , int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue, AtomicLong watermark) {
+    public KafkaConsumerThread(String bootstrapServer , int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue,  ConcurrentHashMap<Integer, Long> watermarks) {
             this.partitionCount = partitionCount;
             Properties consumerProps = new Properties();
             consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer); // Replace with your Kafka broker addresses
@@ -56,8 +56,11 @@ public class KafkaConsumerThread implements Runnable{
             this.consumer = new KafkaConsumer<>(consumerProps);
             this.consumer.subscribe(Collections.singletonList("test_topic")); // Need to update with watermark topic
             this.partitionQueue = queue;
-            this.regex = Pattern.compile(pattern);
-            this.watermark = watermark;
+            this.watermarks = watermarks;
+
+            for(int i = 0; i < partitionCount; i++) {
+                watermarks.put(i, 0L); // Initialize all watermarks
+            }
         }
         @Override
         public void run() {
@@ -66,30 +69,26 @@ public class KafkaConsumerThread implements Runnable{
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(
                         pollTimeMilli));
                 for (ConsumerRecord<String, String> record : records) {
-                    if (record.topic().equals("watermark_topic")) {
-                        watermark.set(Long.parseLong(record.value())); // Assuming the value is the watermark
+                    byte[] record_val = record.value().getBytes(StandardCharsets.UTF_8);
+                    DecorateRecord curr_record = RecordSerdes.fromBytes(record_val);
+                    if (curr_record.isDummyWatermark()) {
+                        updateWatermark(curr_record.getSeqNum(), record.partition());
                     } else {
-                        this.matcher = regex.matcher(record.value());
-                        if (matcher.matches()) {
-                            long seqNum = Long.parseLong(matcher.group(1));
-                            long value = Long.parseLong(matcher.group(2));
-                            kafkaMessage message = new kafkaMessage(
-                                    seqNum,
-                                    value,
-                                    System.currentTimeMillis());
-                            partitionQueue[record.partition()].offer(message);
-                        } else {
-                            System.out.println(
-                                    "data is not in correct format closing " + record.value());
-                            stopRunning();
+                        kafkaMessage message = new kafkaMessage(
+                                curr_record.getSeqNum(),
+                                1,
+                                System.currentTimeMillis());
+                        partitionQueue[record.partition()].offer(message);
                         }
                     }
-                }
                 consumer.commitSync();
-            }
+                }
             close();
         }
 
+        public void updateWatermark(long watermarkValue, int pathID) {
+            watermarks.put(pathID, watermarkValue);
+        }
 
         public void stopRunning() {
             running = false;

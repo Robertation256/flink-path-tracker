@@ -22,10 +22,12 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import javax.swing.*;
@@ -43,19 +45,20 @@ public class KafkaMergeThread implements  Runnable {
         PriorityQueue<minHeapTuple> minHeap;
         Map<Long, Long> latencies ;
         Map<Long, Double> throughput;
-        AtomicLong watermark;
         int numEvents = 0;
         long startTime;
         boolean [] queuePathIDCount;
+        ConcurrentHashMap<Integer, Long> watermarks;
 
-    public KafkaMergeThread(int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue, AtomicLong watermark) {
+
+    public KafkaMergeThread(int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue, ConcurrentHashMap<Integer, Long> watermarks) {
             this.partitionCount = partitionCount;
             this.partitionQueue = queue;
             Comparator<minHeapTuple> tupleComparator = Comparator.comparingLong(t -> t.priority);
             this.minHeap = new PriorityQueue<>(tupleComparator);
             this.latencies = new HashMap<>();
             this.throughput = new HashMap<>();
-            this.watermark = watermark;
+            this.watermarks = watermarks;
             this.queuePathIDCount = new boolean[partitionCount];
     }
         @Override
@@ -89,7 +92,7 @@ public class KafkaMergeThread implements  Runnable {
             while (running) {
                 // Check if watermark has changed
                 // Try to refill all queues which don't have a value already in the heap
-                long currWatermark = watermark.get();
+                long currWatermark = getSmallestWatermark();
                 if(lastCheckedWatermark != currWatermark || minHeap.size() == 0) {
                     if(minHeap.size() != partitionCount) {
                         for (int queueIdx = 0; queueIdx < partitionCount; queueIdx++) {
@@ -146,6 +149,10 @@ public class KafkaMergeThread implements  Runnable {
             long totalTime = (System.currentTimeMillis() - startTime) / 1000 ;
             double throughput_curr = (double) numEvents / totalTime;
             this.throughput.put(System.currentTimeMillis(),throughput_curr);
+        }
+
+        public long getSmallestWatermark() {
+            return Collections.min(watermarks.values());
         }
 
     static class minHeapTuple{
