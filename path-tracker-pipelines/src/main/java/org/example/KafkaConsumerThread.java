@@ -18,7 +18,6 @@
 
 package org.example;
 
-import com.fasterxml.jackson.databind.ObjectReader;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -34,10 +33,6 @@ import java.util.Collections;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class KafkaConsumerThread implements Runnable{
         private volatile boolean running = true;
@@ -45,7 +40,7 @@ public class KafkaConsumerThread implements Runnable{
         Consumer<String, String> consumer;
         private ConcurrentLinkedQueue<kafkaMessage> partitionQueue [];
         ConcurrentHashMap<Integer, Long> watermarks;
-
+        long recordsReceived = 0;
     public KafkaConsumerThread(String bootstrapServer , int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue,  ConcurrentHashMap<Integer, Long> watermarks) {
             this.partitionCount = partitionCount;
             Properties consumerProps = new Properties();
@@ -74,6 +69,7 @@ public class KafkaConsumerThread implements Runnable{
                     if (curr_record.isDummyWatermark()) {
                         updateWatermark(curr_record.getSeqNum(), record.partition());
                     } else {
+                        recordsReceived++;
                         kafkaMessage message = new kafkaMessage(
                                 curr_record.getSeqNum(),
                                 1,
@@ -96,6 +92,7 @@ public class KafkaConsumerThread implements Runnable{
 
         public void stopRunning() {
             running = false;
+            System.out.println("Records received " + recordsReceived);
         }
         public void close() {
             this.consumer.close();

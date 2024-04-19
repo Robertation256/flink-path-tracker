@@ -49,7 +49,7 @@ public class KafkaMergeThread implements  Runnable {
         long startTime;
         boolean [] queuePathIDCount;
         ConcurrentHashMap<Integer, Long> watermarks;
-
+        long valuesPopped = 0;
 
     public KafkaMergeThread(int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue, ConcurrentHashMap<Integer, Long> watermarks) {
             this.partitionCount = partitionCount;
@@ -94,7 +94,11 @@ public class KafkaMergeThread implements  Runnable {
                 // Try to refill all queues which don't have a value already in the heap
                 long currWatermark = getSmallestWatermark();
                 if(lastCheckedWatermark != currWatermark || minHeap.size() == 0) {
-                    System.out.println("Smallest watermark: " + currWatermark + " last checked watermark: " + lastCheckedWatermark);
+                    if (lastCheckedWatermark != currWatermark) {
+                        System.out.println(
+                                "Smallest watermark: " + currWatermark + "  last checked watermark: "
+                                        + lastCheckedWatermark);
+                    }
                     if(minHeap.size() != partitionCount) {
                         for (int queueIdx = 0; queueIdx < partitionCount; queueIdx++) {
                             if(!queuePathIDCount[queueIdx]) { // if a value is not currently in there for this queue
@@ -111,25 +115,19 @@ public class KafkaMergeThread implements  Runnable {
                     }
                     lastCheckedWatermark = currWatermark;
                 }
-                minHeapTuple smallest;
+
                 // if len(heap) == pathNum or heap.peek() < watermark
                 // Pop smallest item
-                if((minHeap.size() == partitionCount) || (minHeap.peek() !=null && minHeap.peek().priority <= lastCheckedWatermark)) {
-                    smallest = minHeap.remove();
-                    queuePathIDCount[smallest.partitionNumber] = false;
-                    ConcurrentLinkedQueue<kafkaMessage> q = smallest.q;
-                    updateStatistics(smallest);
-
-                    // Try to refill if possible, if not move on
-                    kafkaMessage nextNum = q.poll();
-                    if(nextNum != null) {
-                        long nextNumUnpacked = nextNum.seqNum;
-                        minHeapTuple curr = new minHeapTuple(nextNumUnpacked, q, nextNum.arrivalTime, smallest.partitionNumber);
-                        minHeap.add(curr);
-                        queuePathIDCount[smallest.partitionNumber] = true;
-                    }
+                if((minHeap.size() == partitionCount)) {
+                   emitRecord();
+                } else if ((minHeap.peek() !=null) && (minHeap.peek().priority <= lastCheckedWatermark)) {
+                  emitRecord();
                 } else {
-//                    System.out.println("Not able to pop condition 1: " + (minHeap.size() == partitionCount) + " Condition 2: " +  (minHeap.peek() !=null && minHeap.peek().priority <= lastCheckedWatermark));
+                    // Uncomment for debugging
+//                    minHeapTuple curr = minHeap.peek();
+//                    if (curr != null) {
+//                        System.out.println("Could not pop " + curr.priority + " with watermark " + lastCheckedWatermark);
+//                    }
                 }
 
                 // System.out.print(sequenceNum + " "); // uncomment to verify correctness
@@ -140,9 +138,28 @@ public class KafkaMergeThread implements  Runnable {
             running = false;
             statistics.uploadToFile("latency.txt", latencies);
             statistics.uploadToFile("throughput.txt", throughput);
-            System.out.println("Number of latency values " + this.latencies.size());
-            System.out.println("Number of throughput values: " + this.throughput.size());
+            System.out.println("Number of values popped " + valuesPopped) ;
+
         }
+
+        public void emitRecord() {
+            minHeapTuple smallest;
+            smallest = minHeap.remove();
+            queuePathIDCount[smallest.partitionNumber] = false;
+            ConcurrentLinkedQueue<kafkaMessage> q = smallest.q;
+            updateStatistics(smallest);
+            valuesPopped++;
+
+            // Try to refill if possible, if not move on
+            kafkaMessage nextNum = q.poll();
+            if(nextNum != null) {
+                long nextNumUnpacked = nextNum.seqNum;
+                minHeapTuple curr = new minHeapTuple(nextNumUnpacked, q, nextNum.arrivalTime, smallest.partitionNumber);
+                minHeap.add(curr);
+                queuePathIDCount[smallest.partitionNumber] = true;
+            }
+        }
+
         public void updateStatistics(minHeapTuple poppedValue) {
             long processingTime = System.currentTimeMillis() - poppedValue.createTime;
             this.latencies.put(System.currentTimeMillis(), processingTime);
