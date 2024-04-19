@@ -16,28 +16,28 @@
  * limitations under the License.
  */
 
-package org.example;
+package org.example.utils;
 
-import org.apache.kafka.clients.producer.internals.BuiltInPartitioner;
+import com.google.common.primitives.Ints;
 import org.apache.kafka.clients.producer.internals.DefaultPartitioner;
 import org.apache.kafka.common.Cluster;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 
 public class CustomKafkaPartitioner extends DefaultPartitioner {
-    private HashMap<String, Integer> partitionMap = new HashMap<>();
+    private static final Logger LOG = LoggerFactory.getLogger(CustomKafkaPartitioner.class);
+
     @Override
     public int partition(String topic, Object key, byte[] keyBytes, Object value, byte[] valueBytes, Cluster cluster, int numPartitions) {
-        String keyValue = new String(keyBytes, StandardCharsets.UTF_8);
-        if (partitionMap.containsKey(keyValue)){
-            return partitionMap.get(keyValue);
+        int queueId = Ints.fromByteArray(keyBytes);
+        if (queueId >= numPartitions){
+            LOG.error(String.format("Found record with queue id (%d) larger than allocated partition num (%d)", queueId, numPartitions));
+            return -1;      // force an exception
         }
-        else {
-            int pId = partitionMap.size() % numPartitions;
-            partitionMap.put(keyValue, pId);
-            return pId;
-        }
+        return queueId;
 
     }
 }

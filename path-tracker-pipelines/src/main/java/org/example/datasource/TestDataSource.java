@@ -2,7 +2,7 @@ package org.example.datasource;
 
 import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 
-public class TestDataSource extends RichSourceFunction<DecorateRecord<Integer>> {
+public class TestDataSource extends RichSourceFunction<DecorateRecord> {
     private boolean running = true;
 
     private boolean isInfiniteSource = true;
@@ -18,13 +18,15 @@ public class TestDataSource extends RichSourceFunction<DecorateRecord<Integer>> 
     }
 
     @Override
-    public void run(SourceContext<DecorateRecord<Integer>> sourceContext) throws Exception {
+    public void run(SourceContext<DecorateRecord> sourceContext) throws Exception {
         int counter = 0;
 
         long recordsRemaining = this.recordsPerInvocation;
         while (isInfiniteSource || recordsRemaining > 0) {
 
-            sourceContext.collect(new DecorateRecord<Integer>(seqNum++, "", counter++));
+            sourceContext.collect(
+                new DecorateRecord(seqNum++, "")
+            );
 
             if (!isInfiniteSource) {
                 recordsRemaining--;
@@ -36,4 +38,5 @@ public class TestDataSource extends RichSourceFunction<DecorateRecord<Integer>> 
     public void cancel() {
         this.running = false;
     }
+
 }

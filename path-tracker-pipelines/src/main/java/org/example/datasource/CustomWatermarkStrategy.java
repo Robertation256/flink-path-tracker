@@ -9,16 +9,16 @@ import org.apache.flink.api.common.eventtime.WatermarkOutput;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 
 
-public class CustomWatermarkStrategy<T> implements WatermarkStrategy<DecorateRecord<T>> {
+public class CustomWatermarkStrategy<T> implements WatermarkStrategy<DecorateRecord> {
 
     @Override
-    public WatermarkGenerator<DecorateRecord<T>> createWatermarkGenerator(WatermarkGeneratorSupplier.Context context) {
-        return new WatermarkGenerator<DecorateRecord<T>>() {
+    public WatermarkGenerator<DecorateRecord> createWatermarkGenerator(WatermarkGeneratorSupplier.Context context) {
+        return new WatermarkGenerator<DecorateRecord>() {
             private long maxSequenceNumberSeen = Long.MIN_VALUE;
 
             @Override
             public void onEvent(
-                    DecorateRecord<T> event,
+                    DecorateRecord event,
                     long eventTimestamp,
                     WatermarkOutput output) {
                 maxSequenceNumberSeen = Math.max(maxSequenceNumberSeen, event.getSeqNum());
@@ -32,7 +32,7 @@ public class CustomWatermarkStrategy<T> implements WatermarkStrategy<DecorateRec
     }
 
     @Override
-    public TimestampAssigner<DecorateRecord<T>> createTimestampAssigner(TimestampAssignerSupplier.Context context) {
+    public TimestampAssigner<DecorateRecord> createTimestampAssigner(TimestampAssignerSupplier.Context context) {
         return (event, recordTimestamp) -> event.getSeqNum();
     }
 }

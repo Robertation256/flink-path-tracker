@@ -42,10 +42,10 @@ public class GlobalSortPipeline {
                 .rescale()
                 // multiply by 2
                 .map(new TestRichMapFunctionImplForMul2()).setParallelism(4)
-                .keyBy(new KeySelector<DecorateRecord<Integer>, Object>() {
+                .keyBy(new KeySelector<DecorateRecord, Object>() {
                     @Override
-                    public Object getKey(DecorateRecord<Integer> record) throws Exception {
-                        return record.getValue();
+                    public Object getKey(DecorateRecord record) throws Exception {
+                        return record.getSeqNum();
                     }
                 })
                 // square it
@@ -62,16 +62,16 @@ public class GlobalSortPipeline {
 
 
 
-    private static WatermarkStrategy<DecorateRecord<Integer>> getWatermarkStrategy(){
-        return new WatermarkStrategy<DecorateRecord<Integer>>() {
+    private static WatermarkStrategy<DecorateRecord> getWatermarkStrategy(){
+        return new WatermarkStrategy<DecorateRecord>() {
             @Override
-            public WatermarkGenerator<DecorateRecord<Integer>> createWatermarkGenerator(
+            public WatermarkGenerator<DecorateRecord> createWatermarkGenerator(
                     WatermarkGeneratorSupplier.Context context) {
-                return new WatermarkGenerator<DecorateRecord<Integer>>() {
+                return new WatermarkGenerator<DecorateRecord>() {
                     private long currentSeqNum = 0L;
                     @Override
                     public void onEvent(
-                            DecorateRecord<Integer> event,
+                            DecorateRecord event,
                             long eventTimestamp,
                             WatermarkOutput output) {
                         currentSeqNum = Math.max(event.getSeqNum(), currentSeqNum);
@@ -86,7 +86,7 @@ public class GlobalSortPipeline {
                 };
             }
 
-            @Override public TimestampAssigner<DecorateRecord<Integer>> createTimestampAssigner(
+            @Override public TimestampAssigner<DecorateRecord> createTimestampAssigner(
                     TimestampAssignerSupplier.Context context) {
 
                 return ((element, recordTimestamp) -> element.getSeqNum());
@@ -94,8 +94,8 @@ public class GlobalSortPipeline {
         };
     }
 
-    private static ProcessFunction<DecorateRecord<Integer>, DecorateRecord<Integer>> getCheckerFunction(){
-        return new ProcessFunction<DecorateRecord<Integer>, DecorateRecord<Integer>>(){
+    private static ProcessFunction<DecorateRecord, DecorateRecord> getCheckerFunction(){
+        return new ProcessFunction<DecorateRecord, DecorateRecord>(){
 
             private ValueState<Long> prevSeqNum;
             @Override
@@ -105,9 +105,9 @@ public class GlobalSortPipeline {
 
             @Override
             public void processElement(
-                    DecorateRecord<Integer> value,
-                    ProcessFunction<DecorateRecord<Integer>, DecorateRecord<Integer>>.Context ctx,
-                    Collector<DecorateRecord<Integer>> out) throws Exception {
+                    DecorateRecord value,
+                    ProcessFunction<DecorateRecord, DecorateRecord>.Context ctx,
+                    Collector<DecorateRecord> out) throws Exception {
                 if (prevSeqNum.value() == null){
                     prevSeqNum.update(-1L);
                 }
@@ -124,17 +124,17 @@ public class GlobalSortPipeline {
     }
 
 
-    private static ProcessWindowFunction<DecorateRecord<Integer>, DecorateRecord<Integer>, Integer, TimeWindow> getWindowFunction(){
-        return new ProcessWindowFunction<DecorateRecord<Integer>, DecorateRecord<Integer>, Integer, TimeWindow>(){
+    private static ProcessWindowFunction<DecorateRecord, DecorateRecord, Integer, TimeWindow> getWindowFunction(){
+        return new ProcessWindowFunction<DecorateRecord, DecorateRecord, Integer, TimeWindow>(){
             @Override
             public void process(
                     Integer integer,
-                    ProcessWindowFunction<DecorateRecord<Integer>, DecorateRecord<Integer>, Integer, TimeWindow>.Context context,
-                    Iterable<DecorateRecord<Integer>> elements,
-                    Collector<DecorateRecord<Integer>> out) throws Exception {
+                    ProcessWindowFunction<DecorateRecord, DecorateRecord, Integer, TimeWindow>.Context context,
+                    Iterable<DecorateRecord> elements,
+                    Collector<DecorateRecord> out) throws Exception {
 
-                ArrayList<DecorateRecord<Integer>> buffer = new ArrayList<>();
-                for(DecorateRecord<Integer> element: elements){
+                ArrayList<DecorateRecord> buffer = new ArrayList<>();
+                for(DecorateRecord element: elements){
                     buffer.add(element);
                 }
 
@@ -148,7 +148,7 @@ public class GlobalSortPipeline {
                     return -1;
                 });
 
-                for (DecorateRecord<Integer> record: buffer){
+                for (DecorateRecord record: buffer){
                     out.collect(record);
                 }
             }
