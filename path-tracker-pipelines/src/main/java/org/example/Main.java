@@ -25,12 +25,12 @@ import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.example.pipelines.ConfluxPipeline;
 import org.example.pipelines.GlobalSortPipeline;
+import org.example.utils.KafkaAdminUtils;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 import java.util.Collections;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class Main {
@@ -39,13 +39,13 @@ public class Main {
 
 
         String outputTopic = "test_topic";
-        runBaseline();
+//        runBaseline();
 
-//        runConfluxWithKafkaContainer(outputTopic);
+        runConfluxWithKafkaContainer(outputTopic);
 
 //        // alternatively run with local kafka instance
-        String bootstrapServers = "localhost:9092";
-        runConflux(bootstrapServers, outputTopic);
+//        String bootstrapServers = "localhost:9092";
+//        runConflux(bootstrapServers, outputTopic);
 
     }
 
@@ -55,30 +55,19 @@ public class Main {
     }
 
 
-    private static void runConfluxWithKafkaContainer(String outputTopic, String watermarkOutputTopic) throws Exception {
+    private static void runConfluxWithKafkaContainer(String outputTopic) throws Exception {
         KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:6.2.1"));
         kafka.start();
-        runConflux(kafka.getBootstrapServers(), outputTopic, watermarkOutputTopic);
+        runConflux(kafka.getBootstrapServers(), outputTopic);
     }
 
 
-    private static void runConflux(String kafkaBootstrapServers, String outputTopic, String watermarkOutputTopic) throws Exception{
+    private static void runConflux(String kafkaBootstrapServers, String outputTopic) throws Exception{
 
-        StreamExecutionEnvironment env = ConfluxPipeline.create(kafkaBootstrapServers, outputTopic, watermarkOutputTopic);
-        int pathNum = PathAnalyzer.computePathNum(env);
+        StreamExecutionEnvironment env = ConfluxPipeline.create(kafkaBootstrapServers, outputTopic);
+        int pathNum = ConfluxPipeline.getPathNum();
+        KafkaAdminUtils.createTopic(kafkaBootstrapServers, outputTopic, pathNum);
 
-
-        Properties prop = new Properties();
-        prop.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServers);
-
-        try (AdminClient adminClient = AdminClient.create(prop)) {
-            NewTopic newTopic = new NewTopic(outputTopic, pathNum, (short) 1);
-            adminClient.createTopics(Collections.singleton(newTopic)).all().get();
-            System.out.println("Topic created successfully");
-        } catch (Exception e) {
-            System.out.println("Topic probbably exists");
-            e.printStackTrace();
-        }
 
 
         //todo: move K-way merger initialization to a separate start() function

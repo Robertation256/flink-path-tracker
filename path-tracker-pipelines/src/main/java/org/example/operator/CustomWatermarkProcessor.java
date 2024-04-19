@@ -25,31 +25,17 @@ import org.apache.flink.util.OutputTag;
 
 import org.example.datasource.DecorateRecord;
 
-
-public class CustomWatermarkProcessor<T> extends AbstractStreamOperator<DecorateRecord<T>> implements OneInputStreamOperator<DecorateRecord<T>, DecorateRecord<T>> {
-    private String instanceID;
-    private final OutputTag<DecorateRecord<T>> watermarkTag;
-
-    public CustomWatermarkProcessor(OutputTag<DecorateRecord<T>> watermarkTag) {
-        this.watermarkTag = watermarkTag;
-    }
+// access and emit watermarks
+public class CustomWatermarkProcessor extends AbstractStreamOperator<DecorateRecord> implements OneInputStreamOperator<DecorateRecord, DecorateRecord> {
 
     @Override
-    public void open() throws Exception {
-        int subID = getRuntimeContext().getIndexOfThisSubtask();
-        String operatorName = getRuntimeContext().getTaskName();
-        instanceID = String.format("%s_%d", operatorName, subID);
-    }
-
-    @Override
-    public void processElement(StreamRecord<DecorateRecord<T>> element) throws  Exception {
+    public void processElement(StreamRecord<DecorateRecord> element) {
         output.collect(element);
     }
 
     @Override
-    public void processWatermark(org.apache.flink.streaming.api.watermark.Watermark mark) throws Exception {
-        System.out.printf("Received Watermark:%s", mark.getTimestamp());
-        output.collect(watermarkTag, new StreamRecord<>(new DecorateRecord<>(mark.getTimestamp(), true)));
+    public void processWatermark(org.apache.flink.streaming.api.watermark.Watermark mark) {
+        output.collect(new StreamRecord<>(new DecorateRecord(mark.getTimestamp(), true)));
         output.emitWatermark(mark);
     }
 }

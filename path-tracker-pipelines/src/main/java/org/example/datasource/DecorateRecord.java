@@ -18,19 +18,32 @@
 
 package org.example.datasource;
 
-public class DecorateRecord<T> {
-    private long seqNum;
+import org.example.Configuration;
+import org.testcontainers.shaded.org.bouncycastle.util.Strings;
+
+import java.util.Arrays;
+
+public class DecorateRecord {
+    private final boolean isDummyWatermark;
+    private Long seqNum;
+    private byte[] payload;
     private String pathInfo;
 
-    private T value;
+    private int queueId = -1;
 
-    private final boolean isDummyWatermark;
-
-    public DecorateRecord(long SeqNum, String pathInfo, T value) {
-        this.seqNum = SeqNum;
+    public DecorateRecord(long seqNum, String pathInfo) {
+        this.seqNum = seqNum;
         this.pathInfo = pathInfo;
-        this.value = value;
+        this.payload = new byte[Configuration.RECORD_PAYLOAD_BYTE_SIZE];
         this.isDummyWatermark = false;
+    }
+
+
+    public DecorateRecord(boolean isDummyWatermark, long seqNum, byte[] payload, String pathInfo) {
+        this.seqNum = seqNum;
+        this.pathInfo = pathInfo;
+        this.payload = payload;
+        this.isDummyWatermark = isDummyWatermark;
     }
 
     public DecorateRecord(long SeqNum, boolean isDummyWatermark) {
@@ -46,6 +59,9 @@ public class DecorateRecord<T> {
     public long getSeqNum() {
         return seqNum;
     }
+
+    public void setQueueId(int queueId) {this.queueId = queueId;}
+    public int getQueueId(){return queueId;}
 
     // TODO: use xor to compress path information?
     public void addAndSetPathInfo(String vertexID) {
@@ -64,12 +80,12 @@ public class DecorateRecord<T> {
         return this.pathInfo;
     }
 
-    public void setValue(T value) {
-        this.value = value;
+    public void setPayload(byte[] payload) {
+        this.payload = payload;
     }
 
-    public T getValue() {
-        return value;
+    public byte[] getPayload() {
+        return payload;
     }
 
     public boolean isDummyWatermark() {
@@ -79,9 +95,10 @@ public class DecorateRecord<T> {
     @Override
     public String toString() {
         return String.format(
-                "{SeqNumber=%d, PathInfo=(%s), Value=%s}",
+                "{IsWatermark=%b SeqNumber=%d, PathInfo=(%s), Payload=%s}",
+                this.isDummyWatermark,
                 this.getSeqNum(),
                 this.getPathInfo(),
-                this.getValue());
+                Arrays.toString(this.payload));
     }
 }

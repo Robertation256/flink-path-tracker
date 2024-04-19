@@ -1,13 +1,14 @@
 package org.example.operator;
 
+import org.example.Configuration;
 import org.example.datasource.DecorateRecord;
 
-public class TestRichMapFunctionImplForSquare extends DecorateRichMapFunction<Integer, Integer> {
+public class TestRichMapFunctionImplForSquare extends DecorateRichMapFunction {
     @Override
-    public DecorateRecord<Integer> map(DecorateRecord<Integer> record) throws Exception {
+    public DecorateRecord map(DecorateRecord record) throws Exception {
         record.addAndSetPathInfo(instanceID);
-
-        record.setValue(record.getValue() * record.getValue());
+        Thread.sleep(Configuration.OPERATOR_SLEEP_MILLIS);
+        // todo: either insert real workload or reduce all operators to dummy workload with induced sleep
         return record;
     }
 }

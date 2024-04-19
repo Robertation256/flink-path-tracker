@@ -19,21 +19,24 @@
 package org.example;
 
 
+import com.google.common.primitives.Ints;
+
 import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
 
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.example.datasource.DecorateRecord;
-import org.testcontainers.shaded.org.bouncycastle.util.Strings;
+import org.example.utils.RecordSerdes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class CustomKafkaSerializer implements
-        KafkaRecordSerializationSchema<DecorateRecord<Integer>> {
+        KafkaRecordSerializationSchema<DecorateRecord> {
 
     private static final long serialVersionUID = 1L;
+    private static final Logger LOG = LoggerFactory.getLogger(CustomKafkaSerializer.class);
 
-    private String topic;
-
-
+    private final String topic;
 
 
     public CustomKafkaSerializer(String topic)
@@ -43,15 +46,24 @@ public class CustomKafkaSerializer implements
 
     @Override
     public ProducerRecord<byte[], byte[]> serialize(
-            DecorateRecord<Integer> element, KafkaSinkContext context, Long timestamp) {
+            DecorateRecord element, KafkaSinkContext context, Long timestamp) {
+
+
+
+        LOG.info(String.format("Emitting record %s", element));
+
+
+        if (element.getQueueId() < 0){
+            throw new IllegalArgumentException(String.format("Queue id not assigned for record %s", element));
+        }
 
 
 
         try {
             return new ProducerRecord<>(
                     topic,
-                    Strings.toByteArray(element.getPathInfo()) ,
-                    Strings.toByteArray(String.format("%d-%d", element.getSeqNum(), Math.abs(element.getValue())))
+                    Ints.toByteArray(element.getQueueId()) ,
+                    RecordSerdes.toBytes(element)
             );
         } catch (Exception e) {
             throw new IllegalArgumentException(

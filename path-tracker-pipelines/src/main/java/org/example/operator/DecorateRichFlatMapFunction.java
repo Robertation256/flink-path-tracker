@@ -5,11 +5,11 @@ import org.apache.flink.util.Collector;
 
 import org.example.datasource.DecorateRecord;
 
-public class DecorateRichFlatMapFunction<IN, OUT> extends BaseDecorateRichFunction implements FlatMapFunction<DecorateRecord<IN>, DecorateRecord<OUT>> {
+public class DecorateRichFlatMapFunction extends BaseDecorateRichFunction implements FlatMapFunction<DecorateRecord, DecorateRecord> {
     @Override
     public void flatMap(
-            DecorateRecord<IN> record,
-            Collector<DecorateRecord<OUT>> collector) throws Exception {
+            DecorateRecord record,
+            Collector<DecorateRecord> collector) throws Exception {
 
     }
 }

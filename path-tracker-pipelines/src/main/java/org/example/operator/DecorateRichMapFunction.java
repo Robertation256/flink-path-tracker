@@ -4,9 +4,9 @@ import org.apache.flink.api.common.functions.MapFunction;
 
 import org.example.datasource.DecorateRecord;
 
-public class DecorateRichMapFunction<IN, OUT> extends BaseDecorateRichFunction implements MapFunction<DecorateRecord<IN>, DecorateRecord<OUT>> {
+public class DecorateRichMapFunction extends BaseDecorateRichFunction implements MapFunction<DecorateRecord, DecorateRecord> {
     @Override
-    public DecorateRecord<OUT> map(DecorateRecord<IN> inDecorateRecord) throws Exception {
+    public DecorateRecord map(DecorateRecord inDecorateRecord) throws Exception {
         return null;
     }
 }
