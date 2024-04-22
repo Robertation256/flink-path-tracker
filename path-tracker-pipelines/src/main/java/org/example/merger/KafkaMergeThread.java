@@ -92,7 +92,7 @@ public class KafkaMergeThread implements  Runnable {
                         kafkaMessage nextNum = q.poll();
                         if(nextNum != null) {
                             long nextNumUnpacked = nextNum.seqNum;
-                            minHeapTuple curr = new minHeapTuple(nextNumUnpacked, q, nextNum.arrivalTime, queueIdx);
+                            minHeapTuple curr = new minHeapTuple(nextNumUnpacked, nextNum.arrivalTime, queueIdx);
                             minHeap.add(curr);
                             queuePathIDCount[queueIdx] = true;
                         }
@@ -118,7 +118,7 @@ public class KafkaMergeThread implements  Runnable {
                     for (int queueIdx = 0; queueIdx < partitionCount; queueIdx++) {
                         ConcurrentLinkedQueue<kafkaMessage> q = partitionQueue[queueIdx];
                         kafkaMessage temp = q.poll();
-                        minHeapTuple curr = new minHeapTuple(temp.seqNum, q, temp.arrivalTime, queueIdx);
+                        minHeapTuple curr = new minHeapTuple(temp.seqNum, temp.arrivalTime, queueIdx);
                         minHeap.add(curr);
                         queuePathIDCount[queueIdx] = true; // a value from this queue is in the heap
                     }
@@ -146,7 +146,7 @@ public class KafkaMergeThread implements  Runnable {
             }
 
              queuePathIDCount[smallest.partitionNumber] = false;
-             ConcurrentLinkedQueue<kafkaMessage> q = smallest.q;
+             ConcurrentLinkedQueue<kafkaMessage> q = partitionQueue[smallest.partitionNumber];
              updateStatistics(smallest);
              valuesPopped++;
 
@@ -156,7 +156,6 @@ public class KafkaMergeThread implements  Runnable {
                     long nextNumUnpacked = nextNum.seqNum;
                     minHeapTuple curr = new minHeapTuple(
                             nextNumUnpacked,
-                            q,
                             nextNum.arrivalTime,
                             smallest.partitionNumber);
                     minHeap.add(curr);
@@ -179,12 +178,10 @@ public class KafkaMergeThread implements  Runnable {
 
     static class minHeapTuple{
         long priority;
-        ConcurrentLinkedQueue<kafkaMessage> q;
         long createTime;
         int partitionNumber;
-        public minHeapTuple(long priority, ConcurrentLinkedQueue<kafkaMessage> queue, long time, int partitionNumber) {
+        public minHeapTuple(long priority, long time, int partitionNumber) {
             this.priority = priority;
-            this.q = queue; // No longer needed as we can just index into the queue list using partitionNumber but will leave for now
             this.createTime = time;
             this.partitionNumber = partitionNumber;
             }
