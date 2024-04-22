@@ -23,6 +23,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.example.datasource.DecorateRecord;
 import org.example.utils.RecordSerdes;
@@ -37,7 +38,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class KafkaConsumerThread implements Runnable{
         private volatile boolean running = true;
         private int partitionCount;
-        Consumer<String, String> consumer;
+        Consumer<byte[], byte []> consumer;
         private final ConcurrentLinkedQueue<kafkaMessage> [] partitionQueue;
         ConcurrentHashMap<Integer, Long> watermarks;
         long recordsReceived = 0;
@@ -48,8 +49,8 @@ public class KafkaConsumerThread implements Runnable{
             Properties consumerProps = new Properties();
             consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
             consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "test_group_id");
-            consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-            consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+            consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+            consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
             this.consumer = new KafkaConsumer<>(consumerProps);
             this.consumer.subscribe(Collections.singletonList("test_topic"));
             this.partitionQueue = queue;
@@ -63,10 +64,9 @@ public class KafkaConsumerThread implements Runnable{
         public void run() {
             while (running) {
                 int pollTimeMilli = 100;
-                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(pollTimeMilli));
-                for (ConsumerRecord<String, String> record : records) {
-                    byte[] record_val = record.value().getBytes(StandardCharsets.UTF_8);
-                    DecorateRecord curr_record = RecordSerdes.fromBytes(record_val);
+                ConsumerRecords<byte [], byte []> records = consumer.poll(Duration.ofMillis(pollTimeMilli));
+                for (ConsumerRecord<byte [], byte []> record : records) {
+                    DecorateRecord curr_record = RecordSerdes.fromBytes(record.value());
                     if (curr_record.isDummyWatermark()) {
                         updateWatermark(curr_record.getSeqNum(), record.partition());
                     } else {
