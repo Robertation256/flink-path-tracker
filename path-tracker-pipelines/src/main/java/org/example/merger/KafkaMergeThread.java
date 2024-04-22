@@ -65,18 +65,20 @@ public class KafkaMergeThread implements  Runnable {
                 // Check if watermark has changed
                 long currWatermark = getSmallestWatermark();
                 if((lastCheckedWatermark != currWatermark) || (minHeap.size() == 0)) {
-                    if (lastCheckedWatermark != currWatermark) {
-                        System.out.println("Smallest watermark: " + currWatermark + "  last checked watermark: " + lastCheckedWatermark);
-                    }
+//                    if (lastCheckedWatermark != currWatermark) {
+//                        System.out.println("Smallest watermark: " + currWatermark + "  last checked watermark: " + lastCheckedWatermark);
+//                    }
                     refillHeap(); // Fill up heap with one value from every queue if it exists
                     lastCheckedWatermark = currWatermark;
+                } else {
+                    refillHeap();
                 }
 
                 // if len(heap) == pathNum or heap.peek() < watermark
                 // Pop smallest item
                 if((minHeap.size() == partitionCount)) {
                    emitRecord();
-                } else if ((minHeap.peek() !=null) && (minHeap.peek().priority <= lastCheckedWatermark)) {
+                } else if ((minHeap.peek() !=null) && (minHeap.peek().priority <= currWatermark)) {
                   emitRecord();
                 }
             }

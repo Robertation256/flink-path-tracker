@@ -81,7 +81,7 @@ public class Main {
 
         // Make producer, consumer, and merger
         KafkaMergeThread mergeThread = new KafkaMergeThread(pathNum, queue, watermarks);
-        KafkaConsumerThread consumeThread = new KafkaConsumerThread(kafkaBootstrapServers, pathNum, queue, watermarks);
+        KafkaConsumerThread consumeThread = new KafkaConsumerThread(kafkaBootstrapServers, pathNum, queue, watermarks, outputTopic);
 
         Thread merge = new Thread(mergeThread);
         Thread consume = new Thread(consumeThread);

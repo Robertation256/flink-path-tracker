@@ -44,7 +44,7 @@ public class KafkaConsumerThread implements Runnable{
         long recordsReceived = 0;
 
 
-    public KafkaConsumerThread(String bootstrapServer , int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue,  ConcurrentHashMap<Integer, Long> watermarks) {
+    public KafkaConsumerThread(String bootstrapServer , int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue,  ConcurrentHashMap<Integer, Long> watermarks, String topicName) {
             this.partitionCount = partitionCount;
             Properties consumerProps = new Properties();
             consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
@@ -52,7 +52,7 @@ public class KafkaConsumerThread implements Runnable{
             consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
             consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
             this.consumer = new KafkaConsumer<>(consumerProps);
-            this.consumer.subscribe(Collections.singletonList("test_topic"));
+            this.consumer.subscribe(Collections.singletonList(topicName));
             this.partitionQueue = queue;
             this.watermarks = watermarks;
 
@@ -70,6 +70,7 @@ public class KafkaConsumerThread implements Runnable{
                     if (curr_record.isDummyWatermark()) {
                         updateWatermark(curr_record.getSeqNum(), record.partition());
                     } else {
+                        updateWatermark(curr_record.getSeqNum(), record.partition());
                         recordsReceived++;
                         kafkaMessage message = new kafkaMessage(
                                 curr_record.getSeqNum(),
@@ -85,8 +86,8 @@ public class KafkaConsumerThread implements Runnable{
 
         public void updateWatermark(long watermarkValue, int pathID) {
             if(watermarks.get(pathID) < watermarkValue) {
-                System.out.println(
-                        "For path: " + pathID + " Updating watermark to " + watermarkValue);
+//                System.out.println(
+//                        "For path: " + pathID + " Updating watermark to " + watermarkValue);
                 watermarks.put(pathID, watermarkValue);
             }
         }
