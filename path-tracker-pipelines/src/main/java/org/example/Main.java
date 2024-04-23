@@ -18,20 +18,19 @@
 
 package org.example;
 
-import org.apache.flink.streaming.api.environment.PathAnalyzer;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.AdminClientConfig;
-import org.apache.kafka.clients.admin.NewTopic;
+
+import org.example.merger.KafkaConsumerThread;
+import org.example.merger.KafkaMergeThread;
+import org.example.merger.kafkaMessage;
 import org.example.pipelines.ConfluxPipeline;
 import org.example.pipelines.GlobalSortPipeline;
 import org.example.utils.KafkaAdminUtils;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
-import java.util.Collections;
-import java.util.Properties;
+
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class Main {
 
@@ -39,13 +38,13 @@ public class Main {
 
 
         String outputTopic = "test_topic";
-//        runBaseline();
+        // runBaseline();
 
-        runConfluxWithKafkaContainer(outputTopic);
+//         runConfluxWithKafkaContainer(outputTopic);
 
-//        // alternatively run with local kafka instance
-//        String bootstrapServers = "localhost:9092";
-//        runConflux(bootstrapServers, outputTopic);
+        // alternatively run with local kafka instance
+        String bootstrapServers = "localhost:9092";
+        runConflux(bootstrapServers, outputTopic);
 
     }
 
@@ -78,11 +77,11 @@ public class Main {
         }
 
 
-        AtomicLong watermarks = new AtomicLong();
+        ConcurrentHashMap<Integer, Long> watermarks = new ConcurrentHashMap<>();
 
         // Make producer, consumer, and merger
         KafkaMergeThread mergeThread = new KafkaMergeThread(pathNum, queue, watermarks);
-        KafkaConsumerThread consumeThread = new KafkaConsumerThread(kafkaBootstrapServers, pathNum, queue, watermarks);
+        KafkaConsumerThread consumeThread = new KafkaConsumerThread(kafkaBootstrapServers, pathNum, queue, watermarks, outputTopic);
 
         Thread merge = new Thread(mergeThread);
         Thread consume = new Thread(consumeThread);
@@ -95,7 +94,6 @@ public class Main {
 
         try {
             env.execute();
-
             Thread.sleep(10000);
         } catch (Exception e) {
             e.printStackTrace();

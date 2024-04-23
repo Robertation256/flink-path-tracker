@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.example;
+package org.example.merger;
 
 public class kafkaMessage {
     long seqNum, value;

@@ -1,3 +1,21 @@
+#
+# * Licensed to the Apache Software Foundation (ASF) under one
+# * or more contributor license agreements.  See the NOTICE file
+# * distributed with this work for additional information
+# * regarding copyright ownership.  The ASF licenses this file
+# * to you under the Apache License, Version 2.0 (the
+#                                                 * "License"); you may not use this file except in compliance
+# * with the License.  You may obtain a copy of the License at
+# *
+# *     http://www.apache.org/licenses/LICENSE-2.0
+# *
+# * Unless required by applicable law or agreed to in writing, software
+# * distributed under the License is distributed on an "AS IS" BASIS,
+# * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# * See the License for the specific language governing permissions and
+# * limitations under the License.
+
+
 import matplotlib.pyplot as plt
 import csv
 import statistics
@@ -22,6 +40,14 @@ def parse_data(filename):
     return normalizedData
 
 
+def downsample_data(data, max_points=1000):
+    if len(data) <= max_points:
+        return data
+    else:
+        indices = np.round(np.linspace(0, len(data) - 1, max_points)).astype(int)
+        return [data[i] for i in indices]
+
+
 def plot_histogram(values, title):
     plt.hist(values, bins=15, edgecolor="black")
     plt.xlabel("Value")
@@ -31,9 +57,10 @@ def plot_histogram(values, title):
     plt.show()
 
 
-def plot_bar_chart(data, title):
-    timestamps, values = zip(*data)
-    plt.bar(timestamps, values, color="skyblue")
+def plot_dot_plot(data, title):
+    downsampled_data = downsample_data(data)
+    timestamps, values = zip(*downsampled_data)
+    plt.plot(timestamps, values, "o", color="skyblue", markersize=3)
     plt.xlabel("Timestamp")
     plt.ylabel("Value")
     plt.title(title)
@@ -65,5 +92,5 @@ make_statistics(throughout_no_timestamp)
 plot_histogram(latency_no_timestamp, "Latency Histogram")
 plot_histogram(throughout_no_timestamp, "Throughput Histogram")
 
-plot_bar_chart(latency_data, "Latency Data")
-plot_bar_chart(throughput_data, "Throughput Data")
+plot_dot_plot(latency_data, "Latency Data")
+plot_dot_plot(throughput_data, "Throughput Data")
