@@ -21,6 +21,8 @@ package org.example.pipelines;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.PipelineOptions;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -36,6 +38,7 @@ import org.example.operator.CustomWatermarkProcessor;
 import org.example.operator.QueueIdAssigner;
 import org.example.utils.KafkaAdminUtils;
 
+import java.time.Duration;
 import java.util.Properties;
 
 public class ConfluxPipeline {
@@ -44,6 +47,10 @@ public class ConfluxPipeline {
 
     public static StreamExecutionEnvironment create(String kafkaBootstrapServer, String recordOutputTopic) throws Exception{
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        Configuration config = new Configuration();
+        config.set(PipelineOptions.AUTO_WATERMARK_INTERVAL, Duration.ofMillis(org.example.Configuration.WATERMARK_EMISSION_PERIOD_MILLIS));
+        env.configure(config);
+
 
         WatermarkStrategy<DecorateRecord> customWatermarkStrategy = new CustomWatermarkStrategy<>();
 

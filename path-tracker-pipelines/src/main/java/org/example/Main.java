@@ -26,18 +26,25 @@ import org.example.merger.kafkaMessage;
 import org.example.pipelines.ConfluxPipeline;
 import org.example.pipelines.GlobalSortPipeline;
 import org.example.utils.KafkaAdminUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Main {
+    public static final Logger LOG = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) throws Exception {
 
 
-        String outputTopic = "test_topic";
+        String outputTopic = UUID.randomUUID().toString().substring(0,10);
+        LOG.info(String.format("Pipeline output topic: %s", outputTopic));
+
+
         // runBaseline();
 
 //         runConfluxWithKafkaContainer(outputTopic);

@@ -24,11 +24,8 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.example.datasource.DecorateRecord;
 import org.example.utils.RecordSerdes;
-
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Properties;
@@ -51,6 +48,7 @@ public class KafkaConsumerThread implements Runnable{
             consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "test_group_id");
             consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
             consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+            consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
             this.consumer = new KafkaConsumer<>(consumerProps);
             this.consumer.subscribe(Collections.singletonList(topicName));
             this.partitionQueue = queue;

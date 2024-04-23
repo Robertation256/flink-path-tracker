@@ -20,6 +20,8 @@ package org.example.datasource;
 
 import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 
+import java.time.Instant;
+
 public class TestDataSource extends RichSourceFunction<DecorateRecord> {
     private boolean running = true;
 
@@ -37,14 +39,12 @@ public class TestDataSource extends RichSourceFunction<DecorateRecord> {
 
     @Override
     public void run(SourceContext<DecorateRecord> sourceContext) throws Exception {
-        int counter = 0;
 
         long recordsRemaining = this.recordsPerInvocation;
         while (isInfiniteSource || recordsRemaining > 0) {
-
-            sourceContext.collect(
-                new DecorateRecord(seqNum++, "")
-            );
+            DecorateRecord record = new DecorateRecord(seqNum++, "");
+            record.setCreateTime(Instant.now().toEpochMilli());
+            sourceContext.collect(record);
 
             if (!isInfiniteSource) {
                 recordsRemaining--;

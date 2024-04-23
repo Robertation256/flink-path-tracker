@@ -203,9 +203,11 @@ public class KafkaMergeThread implements  Runnable {
         public static void uploadThroughputToFile(String filename, List<KafkaMergeThread.Tuple<Long, Double>> data) {
             try {
                 File file = new File(filename);
-                if (!file.exists()) {
-                    file.createNewFile();
+                if (file.exists()){
+                    file.delete();
                 }
+
+                file.createNewFile();
 
                 try (FileWriter writer = new FileWriter(filename)) {
                     // Write header
@@ -224,9 +226,12 @@ public class KafkaMergeThread implements  Runnable {
         public static void uploadLatencyToFile(String filename, List<KafkaMergeThread.Tuple<Long, Long>> data) {
             try {
                 File file = new File(filename);
-                if (!file.exists()) {
-                    file.createNewFile();
+                if (file.exists()){
+                    file.delete();
                 }
+
+                file.createNewFile();
+
 
                 try (FileWriter writer = new FileWriter(filename)) {
                     // Write header

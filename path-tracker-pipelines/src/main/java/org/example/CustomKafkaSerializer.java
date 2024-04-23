@@ -29,6 +29,8 @@ import org.example.utils.RecordSerdes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
+
 
 public class CustomKafkaSerializer implements
         KafkaRecordSerializationSchema<DecorateRecord> {
@@ -49,15 +51,11 @@ public class CustomKafkaSerializer implements
             DecorateRecord element, KafkaSinkContext context, Long timestamp) {
 
 
-
-//        LOG.info(String.format("Emitting record %s", element));
-
-
         if (element.getQueueId() < 0){
             throw new IllegalArgumentException(String.format("Queue id not assigned for record %s", element));
         }
 
-
+        element.setSinkTime(Instant.now().toEpochMilli());
 
         try {
             return new ProducerRecord<>(

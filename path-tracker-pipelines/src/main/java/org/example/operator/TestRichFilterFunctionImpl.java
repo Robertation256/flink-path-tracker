@@ -24,7 +24,10 @@ import org.example.datasource.DecorateRecord;
 public class TestRichFilterFunctionImpl extends DecorateRichFilterFunction {
     @Override
     public boolean filter(DecorateRecord record) throws Exception {
-        Thread.sleep(Configuration.OPERATOR_SLEEP_MILLIS);
+        long cycles = Configuration.OPERATOR_WORKLOAD_CYCLES;
+        while (cycles > 0){
+            cycles--;
+        }
 
         if (record.getSeqNum() % 7 == 0) {
             return false;
