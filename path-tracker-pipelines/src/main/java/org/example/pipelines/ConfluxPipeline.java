@@ -39,6 +39,7 @@ import org.example.operator.QueueIdAssigner;
 import org.example.utils.KafkaAdminUtils;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Properties;
 
 public class ConfluxPipeline {
@@ -70,6 +71,10 @@ public class ConfluxPipeline {
                 .setParallelism(1)
                 .keyBy(r -> 1)
                 .process(new QueueIdAssigner(pathNum)).setParallelism(1)
+                .map(record -> {
+                    record.setSinkTime(Instant.now().toEpochMilli());
+                    return record;
+                }).setParallelism(1)
                 .sinkTo(getRecordSink(kafkaBootstrapServer, recordOutputTopic)).setParallelism(1);
 
 

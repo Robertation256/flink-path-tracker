@@ -41,6 +41,6 @@ public class Workload {
                     record -> {
                         record.setProcessCompletionTime(Instant.now().toEpochMilli());
                         return record;
-                    });
+                    }).setParallelism(1);
     }
 }

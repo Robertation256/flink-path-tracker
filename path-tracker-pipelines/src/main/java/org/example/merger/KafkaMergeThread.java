@@ -18,63 +18,85 @@
 
 package org.example.merger;
 
+import com.esotericsoftware.minlog.Log;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.example.datasource.DecorateRecord;
+import org.example.utils.RecordSerdes;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 
-public class KafkaMergeThread implements  Runnable {
+public class KafkaMergeThread extends   Thread {
         private volatile boolean running = true;
         private final int partitionCount;
-        private final ConcurrentLinkedQueue<kafkaMessage> [] partitionQueue;
-        PriorityQueue<minHeapTuple> minHeap;
-        List<Tuple<Long, Long>> latencies;
-        List<Tuple<Long, Double>> throughput;
+        public final ConcurrentLinkedQueue<DecorateRecord> [] partitionQueue;
+        PriorityQueue<MinHeapTuple> minHeap;
+        private final KafkaProducer<byte[], byte[]> kafkaProducer;
+        private final String outputTopic;
 
         int numEvents = 0;
         long startTime;
         boolean [] queuePathIDCount;
-        ConcurrentHashMap<Integer, Long> watermarks;
+        public final ConcurrentHashMap<Integer, Long> watermarks;
         long valuesPopped = 0;
         long lastSeqNum = 0;
 
 
-    public KafkaMergeThread(int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue, ConcurrentHashMap<Integer, Long> watermarks) {
+    public KafkaMergeThread(String kafkaServers, String outputTopic, int partitionCount) {
             this.partitionCount = partitionCount;
-            this.partitionQueue = queue;
-            Comparator<minHeapTuple> tupleComparator = Comparator.comparingLong(t -> t.priority);
+            this.partitionQueue = new ConcurrentLinkedQueue[partitionCount];
+
+            for (int i = 0; i < partitionCount; i++) {
+                partitionQueue[i] = new ConcurrentLinkedQueue<>();
+            }
+
+            Comparator<MinHeapTuple> tupleComparator = Comparator.comparingLong(t -> t.priority);
             this.minHeap = new PriorityQueue<>(tupleComparator);
-            this.latencies = new ArrayList<>();
-            this.throughput = new ArrayList<>();
-            this.watermarks = watermarks;
+            this.watermarks = new ConcurrentHashMap<>();;
             this.queuePathIDCount = new boolean[partitionCount];
+
+            Properties props = new Properties();
+            props.put("bootstrap.servers", kafkaServers);
+            props.put("key.serializer", ByteArraySerializer.class.getName());
+            props.put("value.serializer", ByteArraySerializer.class.getName());
+
+            this.kafkaProducer = new KafkaProducer<>(props);
+            this.outputTopic = outputTopic;
+
     }
         @Override
         public void run() {
+            Log.info("K-way merger merge thread started");
             init_heap(); // Push one value from each path onto the heap
             long lastCheckedWatermark = 0;
 
-            while (running) {
+            Log.info("K-way merger heap initialized");
+
+            while (running && !isCompleted()) {
                 // Check if watermark has changed
                 long currWatermark = getSmallestWatermark();
+
                 if((lastCheckedWatermark != currWatermark) || (minHeap.size() == 0)) {
-//                    if (lastCheckedWatermark != currWatermark) {
-//                        System.out.println("Smallest watermark: " + currWatermark + "  last checked watermark: " + lastCheckedWatermark);
-//                    }
                     refillHeap(); // Fill up heap with one value from every queue if it exists
                     lastCheckedWatermark = currWatermark;
                 } else {
                     refillHeap();
                 }
 
-                // if len(heap) == pathNum or heap.peek() < watermark
                 // Pop smallest item
                 if((minHeap.size() == partitionCount)) {
                    emitRecord();
@@ -82,23 +104,45 @@ public class KafkaMergeThread implements  Runnable {
                   emitRecord();
                 }
             }
+
+            Log.info("Received final watermark from Flink. Shutting down merge thread.");
+            stopRunning();
         }
 
         public void refillHeap() {
             if(minHeap.size() != partitionCount) {
                 for (int queueIdx = 0; queueIdx < partitionCount; queueIdx++) {
                     if(!queuePathIDCount[queueIdx]) { // if a value is not currently in there for this queue
-                        ConcurrentLinkedQueue<kafkaMessage> q = partitionQueue[queueIdx];
-                        kafkaMessage nextNum = q.poll();
-                        if(nextNum != null) {
-                            long nextNumUnpacked = nextNum.seqNum;
-                            minHeapTuple curr = new minHeapTuple(nextNumUnpacked, nextNum.arrivalTime, queueIdx);
+                        ConcurrentLinkedQueue<DecorateRecord> q = partitionQueue[queueIdx];
+                        DecorateRecord nextRecord = q.poll();
+                        if(nextRecord != null) {
+                            nextRecord.setHeapPushTime(Instant.now().toEpochMilli());
+                            MinHeapTuple curr = new MinHeapTuple(nextRecord.getSeqNum(), queueIdx, nextRecord);
                             minHeap.add(curr);
                             queuePathIDCount[queueIdx] = true;
                         }
                     }
                 }
             }
+        }
+
+        private boolean isCompleted(){
+            // Flink announce signals a final watermark with Long.MAX_VALUE
+
+            if (getSmallestWatermark() != Long.MAX_VALUE || !minHeap.isEmpty()){
+                return false;
+            }
+
+
+
+            // check if all local queues are drained
+            for (ConcurrentLinkedQueue<DecorateRecord> q: partitionQueue){
+                if (!q.isEmpty()){
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         public void init_heap() {
@@ -108,17 +152,18 @@ public class KafkaMergeThread implements  Runnable {
 
             // Initial queue instantiation
             while(!queueInitialized) {
-                for (ConcurrentLinkedQueue<kafkaMessage> q : partitionQueue) {
-                    if (q.size() == 0) {
+                for (ConcurrentLinkedQueue<DecorateRecord> q : partitionQueue) {
+                    if (q.isEmpty()) {
                         foundEmptyQueue = true;
                         break;
                     }
                 }
                 if(!foundEmptyQueue) {
                     for (int queueIdx = 0; queueIdx < partitionCount; queueIdx++) {
-                        ConcurrentLinkedQueue<kafkaMessage> q = partitionQueue[queueIdx];
-                        kafkaMessage temp = q.poll();
-                        minHeapTuple curr = new minHeapTuple(temp.seqNum, temp.arrivalTime, queueIdx);
+                        ConcurrentLinkedQueue<DecorateRecord> q = partitionQueue[queueIdx];
+                        DecorateRecord record = q.poll();
+                        record.setHeapPushTime(Instant.now().toEpochMilli());
+                        MinHeapTuple curr = new MinHeapTuple(record.getSeqNum(), queueIdx, record);
                         minHeap.add(curr);
                         queuePathIDCount[queueIdx] = true; // a value from this queue is in the heap
                     }
@@ -130,123 +175,56 @@ public class KafkaMergeThread implements  Runnable {
 
         public void stopRunning() {
             running = false;
-            statistics.uploadLatencyToFile("latency.txt", latencies);
-            statistics.uploadThroughputToFile("throughput.txt", throughput);
-            System.out.println("Number of values popped " + valuesPopped) ;
+            Log.info("Shutting down K-way merger merge thread. Total number of records popped: " + valuesPopped) ;
         }
 
         public void emitRecord() {
-            minHeapTuple smallest;
+            MinHeapTuple smallest;
             smallest = minHeap.remove();
+            smallest.record.setEmitTime(Instant.now().toEpochMilli());
             if (lastSeqNum > smallest.priority) {
-                System.out.println("=========\nSafety Violation\n========== \n" + "Last seq Number: " + lastSeqNum + " Curr Seq Number " + smallest.priority);
+                Log.error("=========\nSafety Violation\n========== \n" + "Last seq Number: " + lastSeqNum + " Curr Seq Number " + smallest.priority);
                 stopRunning();
             } else {
                 lastSeqNum = smallest.priority;
             }
 
+            kafkaProducer.send(new ProducerRecord<>(outputTopic, RecordSerdes.toBytes(smallest.record)));
+
              queuePathIDCount[smallest.partitionNumber] = false;
-             ConcurrentLinkedQueue<kafkaMessage> q = partitionQueue[smallest.partitionNumber];
-             updateStatistics(smallest);
+             ConcurrentLinkedQueue<DecorateRecord> q = partitionQueue[smallest.partitionNumber];
              valuesPopped++;
 
                 // Try to refill if possible, if not move on
-                kafkaMessage nextNum = q.poll();
-                if (nextNum != null) {
-                    long nextNumUnpacked = nextNum.seqNum;
-                    minHeapTuple curr = new minHeapTuple(
-                            nextNumUnpacked,
-                            nextNum.arrivalTime,
-                            smallest.partitionNumber);
+                DecorateRecord record = q.poll();
+                if (record != null) {
+                    record.setHeapPushTime(Instant.now().toEpochMilli());
+                    MinHeapTuple curr = new MinHeapTuple(
+                            record.getSeqNum(),
+                            smallest.partitionNumber,
+                            record
+                    );
                     minHeap.add(curr);
                     queuePathIDCount[smallest.partitionNumber] = true;
                 }
         }
 
-        public void updateStatistics(minHeapTuple poppedValue) {
-            long processingTime = System.currentTimeMillis() - poppedValue.createTime;
-            this.latencies.add(new Tuple<>(System.currentTimeMillis(), processingTime)) ;
-            numEvents++;
-            long totalTime = (System.currentTimeMillis() - startTime) / 1000 ;
-            double throughput_curr = (double) numEvents / totalTime;
-            this.throughput.add(new Tuple<>(System.currentTimeMillis(),throughput_curr));
-        }
 
         public long getSmallestWatermark() {
             return Collections.min(watermarks.values());
         }
 
-    static class minHeapTuple{
+    static class MinHeapTuple {
         long priority;
-        long createTime;
         int partitionNumber;
-        public minHeapTuple(long priority, long time, int partitionNumber) {
+        DecorateRecord record;
+        public MinHeapTuple(long priority, int partitionNumber, DecorateRecord record) {
             this.priority = priority;
-            this.createTime = time;
             this.partitionNumber = partitionNumber;
+            this.record = record;
             }
         }
 
-    public static class Tuple<K, V> {
-        K first;
-        V second;
-
-        public Tuple(K first, V second) {
-            this.first = first;
-            this.second = second;
-        }
     }
-    }
-
-
-    class statistics {
-        public static void uploadThroughputToFile(String filename, List<KafkaMergeThread.Tuple<Long, Double>> data) {
-            try {
-                File file = new File(filename);
-                if (file.exists()){
-                    file.delete();
-                }
-
-                file.createNewFile();
-
-                try (FileWriter writer = new FileWriter(filename)) {
-                    // Write header
-                    writer.write("Timestamp,Value\n");
-
-                    // Write data to file
-                    for (KafkaMergeThread.Tuple<Long, ?> tuple : data) {
-                        writer.write(tuple.first + "," + tuple.second + "\n");
-                    }
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-
-        public static void uploadLatencyToFile(String filename, List<KafkaMergeThread.Tuple<Long, Long>> data) {
-            try {
-                File file = new File(filename);
-                if (file.exists()){
-                    file.delete();
-                }
-
-                file.createNewFile();
-
-
-                try (FileWriter writer = new FileWriter(filename)) {
-                    // Write header
-                    writer.write("Timestamp,Value\n");
-
-                    // Write data to file
-                    for (KafkaMergeThread.Tuple<Long, ?> tuple : data) {
-                        writer.write(tuple.first + "," + tuple.second + "\n");
-                    }
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-
-}
 
 

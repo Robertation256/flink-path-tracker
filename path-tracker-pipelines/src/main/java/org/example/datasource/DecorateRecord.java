@@ -23,13 +23,18 @@ import java.util.Arrays;
 
 public class DecorateRecord {
     private final boolean isDummyWatermark;
-    private Long seqNum;
+    private long seqNum;
     private byte[] payload;
     private String pathInfo;
 
     private int queueId = -1;
 
     private long createTime;
+    private long processCompletionTime;
+    private long sinkTime;
+    private long consumeTime;
+    private long heapPushTime;
+    private long emitTime;
 
     public long getProcessCompletionTime() {
         return processCompletionTime;
@@ -39,16 +44,6 @@ public class DecorateRecord {
         this.processCompletionTime = processCompletionTime;
     }
 
-    public void setSeqNum(Long seqNum) {
-        this.seqNum = seqNum;
-    }
-
-    private long processCompletionTime;
-    private long sinkTime;
-
-    private long consumeTime;
-    private long heapPushTime;
-    private long emitTime;
 
     public long getCreateTime() {
         return createTime;
