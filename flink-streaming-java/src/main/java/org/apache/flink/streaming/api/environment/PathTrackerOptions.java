@@ -22,6 +22,7 @@ import org.apache.flink.configuration.ConfigOption;
 
 import static org.apache.flink.configuration.ConfigOptions.key;
 
+/** Option for enabling path tracker. */
 public class PathTrackerOptions {
 
     public static final ConfigOption<Boolean> ENABLE =

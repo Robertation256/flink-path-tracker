@@ -33,6 +33,7 @@ public class RecordSerdes {
     public static byte[] toBytes(DecorateRecord record){
         byte[] seqNumBytes = Longs.toByteArray(record.getSeqNum());
         byte[] createTime = Longs.toByteArray(record.getCreateTime());
+        byte[] processCompletionTime = Longs.toByteArray(record.getProcessCompletionTime());
         byte[] sinkTime = Longs.toByteArray(record.getSinkTime());
         byte[] consumeTime = Longs.toByteArray(record.getConsumeTime());
         byte[] heapPushTime = Longs.toByteArray(record.getHeapPushTime());
@@ -41,7 +42,7 @@ public class RecordSerdes {
         int size;
         byte[] result;
 
-        size = 9 + 5 * Long.BYTES + pathInfoBytes.length + (record.isDummyWatermark()?0:Configuration.RECORD_PAYLOAD_BYTE_SIZE);
+        size = 9 + 6 * Long.BYTES + pathInfoBytes.length + (record.isDummyWatermark()?0:Configuration.RECORD_PAYLOAD_BYTE_SIZE);
         result = new byte[size];
 
         int offset = 0;
@@ -50,6 +51,8 @@ public class RecordSerdes {
         System.arraycopy(seqNumBytes, 0, result, offset, Long.BYTES);
         offset += Long.BYTES;
         System.arraycopy(createTime, 0, result, offset, Long.BYTES);
+        offset += Long.BYTES;
+        System.arraycopy(processCompletionTime, 0, result, offset, Long.BYTES);
         offset += Long.BYTES;
         System.arraycopy(sinkTime, 0, result, offset, Long.BYTES);
         offset += Long.BYTES;
@@ -82,6 +85,8 @@ public class RecordSerdes {
         offset += Long.BYTES;
         long createTime = readLong(payload,offset);
         offset += Long.BYTES;
+        long processCompletionTime = readLong(payload,offset);
+        offset += Long.BYTES;
         long sinkTime = readLong(payload,offset);
         offset += Long.BYTES;
         long consumeTime = readLong(payload,offset);
@@ -107,6 +112,7 @@ public class RecordSerdes {
         }
         DecorateRecord record = new DecorateRecord(isWatermark, seqNum, recordPayload, pathInfo);
         record.setCreateTime(createTime);
+        record.setProcessCompletionTime(processCompletionTime);
         record.setSinkTime(sinkTime);
         record.setConsumeTime(consumeTime);
         record.setHeapPushTime(heapPushTime);
@@ -128,6 +134,7 @@ public class RecordSerdes {
                 true, 666L, payload, "test-path-info"
         );
         watermark.setCreateTime(11);
+        watermark.setProcessCompletionTime(666);
         watermark.setSinkTime(22);
         watermark.setConsumeTime(33);
         watermark.setHeapPushTime(44);
@@ -137,6 +144,7 @@ public class RecordSerdes {
                 false, 777L, payload, "test-path-info2"
         );
         record.setCreateTime(11);
+        record.setProcessCompletionTime(777);
         record.setSinkTime(22);
         record.setConsumeTime(33);
         record.setHeapPushTime(44);

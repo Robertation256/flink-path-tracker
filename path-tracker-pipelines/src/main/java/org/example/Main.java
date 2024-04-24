@@ -20,6 +20,7 @@ package org.example;
 
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
+import org.apache.log4j.BasicConfigurator;
 import org.example.merger.KafkaConsumerThread;
 import org.example.merger.KafkaMergeThread;
 import org.example.merger.kafkaMessage;
@@ -31,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -39,20 +41,34 @@ public class Main {
     public static final Logger LOG = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) throws Exception {
+        BasicConfigurator.configure();
 
-
+        // default to launching conflux if not specified
+        boolean runBaseline = Arrays.asList(args).contains("runBaseline");
         String outputTopic = UUID.randomUUID().toString().substring(0,10);
-        LOG.info(String.format("Pipeline output topic: %s", outputTopic));
-
-
-        // runBaseline();
-
-//         runConfluxWithKafkaContainer(outputTopic);
-
-        // alternatively run with local kafka instance
         String bootstrapServers = "localhost:9092";
-        runConflux(bootstrapServers, outputTopic);
 
+        for (String arg: args){
+            if (arg.contains("output_topic=")){
+                outputTopic = arg.split("=")[1];
+            }
+
+            if (arg.contains("kafka_server=")){
+                bootstrapServers = arg.split("=")[1];
+            }
+
+        }
+
+
+        LOG.info(String.format("Launching with configuration: isBaseline=%b, output_topic=%s, kafka_server=%s",runBaseline,  outputTopic, bootstrapServers));
+
+
+//        if (runBaseline){
+//            runBaseline();
+//        }
+//        else {
+//            runConflux(bootstrapServers, outputTopic);
+//        }
     }
 
     private static void runBaseline() throws Exception{

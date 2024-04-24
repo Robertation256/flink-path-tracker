@@ -30,6 +30,20 @@ public class DecorateRecord {
     private int queueId = -1;
 
     private long createTime;
+
+    public long getProcessCompletionTime() {
+        return processCompletionTime;
+    }
+
+    public void setProcessCompletionTime(long processCompletionTime) {
+        this.processCompletionTime = processCompletionTime;
+    }
+
+    public void setSeqNum(Long seqNum) {
+        this.seqNum = seqNum;
+    }
+
+    private long processCompletionTime;
     private long sinkTime;
 
     private long consumeTime;
@@ -143,11 +157,12 @@ public class DecorateRecord {
     @Override
     public String toString() {
         return String.format(
-                "{IsWatermark=%b SeqNumber=%d, PathInfo=(%s), CreateTime=%d, SinkTime=%d, ConsumeTime=%d, HeapPushTime=%d, EmitTime=%d, Payload=%s}",
+                "{IsWatermark=%b SeqNumber=%d, PathInfo=(%s), CreateTime=%d, ProcessCompletionTime=%d, SinkTime=%d, ConsumeTime=%d, HeapPushTime=%d, EmitTime=%d, Payload=%s}",
                 this.isDummyWatermark,
                 this.getSeqNum(),
                 this.getPathInfo(),
                 this.getCreateTime(),
+                this.getProcessCompletionTime(),
                 this.getSinkTime(),
                 this.getConsumeTime(),
                 this.getHeapPushTime(),
