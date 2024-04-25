@@ -74,15 +74,15 @@ public class Main {
 
 
         if (runBaseline){
-            runBaseline();
+            runBaseline(bootstrapServers, flinkTopic);
         }
         else {
             runConflux(bootstrapServers, flinkTopic, mergerTopic);
         }
     }
 
-    private static void runBaseline() throws Exception{
-        StreamExecutionEnvironment env = GlobalSortPipeline.create();
+    private static void runBaseline(String kafkaServers, String outputTopic) throws Exception{
+        StreamExecutionEnvironment env = GlobalSortPipeline.create(kafkaServers, outputTopic);
         env.execute();
     }
 

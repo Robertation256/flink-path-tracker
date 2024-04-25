@@ -32,24 +32,34 @@ import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.PipelineOptions;
+import org.apache.flink.connector.base.DeliveryGuarantee;
+import org.apache.flink.connector.kafka.sink.KafkaSink;
+import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.ProcessFunction;
+import org.apache.flink.streaming.api.functions.sink.v2.DiscardingSink;
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
+
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.example.CustomKafkaSerializer;
+import org.example.datasource.CustomWatermarkStrategy;
 import org.example.datasource.DecorateRecord;
 import org.example.datasource.TestDataSource;
 import org.example.operator.TestRichFilterFunctionImpl;
 import org.example.operator.TestRichMapFunctionImplForMul2;
 import org.example.operator.TestRichMapFunctionImplForSquare;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Properties;
 
 
 public class GlobalSortPipeline {
 
-    public static StreamExecutionEnvironment create(){
+    public static StreamExecutionEnvironment create(String kafkaServers, String outputTopic){
         long windowSize = 1000L;
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -58,29 +68,35 @@ public class GlobalSortPipeline {
         env.configure(config);
 
 
-        env.addSource(new TestDataSource(100000)).setParallelism(1)
+        DataStream<DecorateRecord> source = env.addSource(new TestDataSource(100000)).setParallelism(1)
                 // filter out multiples of 7
-                .assignTimestampsAndWatermarks(getWatermarkStrategy())
-                .filter(new TestRichFilterFunctionImpl()).setParallelism(3)
-                .rescale()
-                // multiply by 2
-                .map(new TestRichMapFunctionImplForMul2()).setParallelism(4)
-                .keyBy(new KeySelector<DecorateRecord, Object>() {
-                    @Override
-                    public Object getKey(DecorateRecord record) throws Exception {
-                        return record.getSeqNum();
-                    }
-                })
-                // square it
-                .map(new TestRichMapFunctionImplForSquare()).setParallelism(2)
-                .keyBy(t -> 1)
+                .assignTimestampsAndWatermarks(getWatermarkStrategy());
+
+
+        DataStream<DecorateRecord> records = Workload.attachTestPipeline(source);
+        DataStream<DecorateRecord> sorted = records.keyBy(t -> 1)
                 .window(TumblingEventTimeWindows.of(Duration.ofMillis(windowSize)))
-                .process(getWindowFunction()).setParallelism(1)
-                .keyBy(t -> 1).
+                .process(getWindowFunction()).setParallelism(1);
+
+
+        sorted.sinkTo(getRecordSink(kafkaServers, outputTopic)).setParallelism(1);
+
+        sorted.keyBy(t -> 1).
                 process(getCheckerFunction()).setParallelism(1)
-                .print().setParallelism(1);
+                .sinkTo(new DiscardingSink<>());
 
         return env;
+    }
+
+    private static KafkaSink<DecorateRecord> getRecordSink(String kafkaServer, String topic){
+
+
+        return KafkaSink.<DecorateRecord>builder()
+                .setBootstrapServers(kafkaServer)
+                .setRecordSerializer(new CustomKafkaSerializer(topic))
+                .setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE)
+                .build();
+
     }
 
 
@@ -116,6 +132,9 @@ public class GlobalSortPipeline {
             }
         };
     }
+
+
+
 
     private static ProcessFunction<DecorateRecord, DecorateRecord> getCheckerFunction(){
         return new ProcessFunction<DecorateRecord, DecorateRecord>(){
@@ -172,6 +191,7 @@ public class GlobalSortPipeline {
                 });
 
                 for (DecorateRecord record: buffer){
+                    record.setSinkTime(Instant.now().toEpochMilli());
                     out.collect(record);
                 }
             }

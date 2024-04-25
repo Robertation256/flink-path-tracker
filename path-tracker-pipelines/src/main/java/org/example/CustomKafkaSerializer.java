@@ -48,12 +48,6 @@ public class CustomKafkaSerializer implements
     public ProducerRecord<byte[], byte[]> serialize(
             DecorateRecord element, KafkaSinkContext context, Long timestamp) {
 
-
-        if (element.getQueueId() < 0){
-            throw new IllegalArgumentException(String.format("Queue id not assigned for record %s", element));
-        }
-
-
         try {
             return new ProducerRecord<>(
                     topic,
