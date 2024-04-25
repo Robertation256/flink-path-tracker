@@ -68,7 +68,7 @@ public class GlobalSortPipeline {
         env.configure(config);
 
 
-        DataStream<DecorateRecord> source = env.addSource(new TestDataSource(100000)).setParallelism(1)
+        DataStream<DecorateRecord> source = env.addSource(new TestDataSource(org.example.Configuration.DATASOURCE_SIZE)).setParallelism(1)
                 // filter out multiples of 7
                 .assignTimestampsAndWatermarks(getWatermarkStrategy());
 

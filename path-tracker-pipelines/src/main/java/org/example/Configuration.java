@@ -25,4 +25,6 @@ public class Configuration {
     public static final long WATERMARK_EMISSION_PERIOD_MILLIS = 200L;
 
     public static final int RECORD_PAYLOAD_BYTE_SIZE = 10;
+
+    public static final long DATASOURCE_SIZE = 100000L;
 }
