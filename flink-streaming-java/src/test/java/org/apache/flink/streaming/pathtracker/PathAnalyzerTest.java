@@ -29,6 +29,7 @@ import org.junit.Test;
 
 import java.util.Collections;
 
+/** Test for {@link PathAnalyzer}. */
 public class PathAnalyzerTest {
     private static final String EXEC_NAME = "test-executor";
 

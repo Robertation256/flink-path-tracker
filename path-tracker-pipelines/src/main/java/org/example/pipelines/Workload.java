@@ -25,6 +25,8 @@ import org.example.operator.TestRichFilterFunctionImpl;
 import org.example.operator.TestRichMapFunctionImplForMul2;
 import org.example.operator.TestRichMapFunctionImplForSquare;
 
+import java.time.Instant;
+
 public class Workload {
 
     public static DataStream<DecorateRecord> attachTestPipeline(DataStream<DecorateRecord> datasource){
@@ -34,6 +36,11 @@ public class Workload {
                 .map(new TestRichMapFunctionImplForMul2()).setParallelism(4)
                 .keyBy(DecorateRecord::getSeqNum)
                 // square it
-                .map(new TestRichMapFunctionImplForSquare()).setParallelism(2);
+                .map(new TestRichMapFunctionImplForSquare()).setParallelism(2)
+                .map(
+                    record -> {
+                        record.setProcessCompletionTime(Instant.now().toEpochMilli());
+                        return record;
+                    }).setParallelism(1);
     }
 }

@@ -18,70 +18,91 @@
 
 package org.example;
 
+import com.esotericsoftware.minlog.Log;
+
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
+import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Level;
+import org.example.datasource.DecorateRecord;
 import org.example.merger.KafkaConsumerThread;
 import org.example.merger.KafkaMergeThread;
 import org.example.merger.kafkaMessage;
 import org.example.pipelines.ConfluxPipeline;
 import org.example.pipelines.GlobalSortPipeline;
 import org.example.utils.KafkaAdminUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.util.Arrays;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Main {
+    public static final Logger LOG = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) throws Exception {
+        BasicConfigurator.configure();
+        org.apache.log4j.Logger.getRootLogger().setLevel(Level.INFO);
 
-
-        String outputTopic = "test_topic";
-        // runBaseline();
-
-//         runConfluxWithKafkaContainer(outputTopic);
-
-        // alternatively run with local kafka instance
+        // default to launching conflux if not specified
+        boolean runBaseline = Arrays.asList(args).contains("runBaseline");
+        String flinkTopic = UUID.randomUUID().toString().substring(0,10);
+        String mergerTopic = UUID.randomUUID().toString().substring(0,10);
         String bootstrapServers = "localhost:9092";
-        runConflux(bootstrapServers, outputTopic);
 
+        for (String arg: args){
+            if (arg.contains("flink_topic=")){
+                flinkTopic = arg.split("=")[1];
+            }
+
+            if (arg.contains("merger_topic=")){
+                mergerTopic = arg.split("=")[1];
+            }
+
+            if (arg.contains("kafka_server=")){
+                bootstrapServers = arg.split("=")[1];
+            }
+
+        }
+
+
+        LOG.info(String.format("Launching with configuration: isBaseline=%b, flink_topic=%s, merger_topic:%s, kafka_server=%s",runBaseline, flinkTopic, mergerTopic, bootstrapServers));
+
+
+        if (runBaseline){
+            runBaseline(bootstrapServers, flinkTopic);
+        }
+        else {
+            runConflux(bootstrapServers, flinkTopic, mergerTopic);
+        }
     }
 
-    private static void runBaseline() throws Exception{
-        StreamExecutionEnvironment env = GlobalSortPipeline.create();
+    private static void runBaseline(String kafkaServers, String outputTopic) throws Exception{
+        StreamExecutionEnvironment env = GlobalSortPipeline.create(kafkaServers, outputTopic);
         env.execute();
     }
 
 
-    private static void runConfluxWithKafkaContainer(String outputTopic) throws Exception {
-        KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:6.2.1"));
-        kafka.start();
-        runConflux(kafka.getBootstrapServers(), outputTopic);
-    }
 
+    private static void runConflux(String kafkaBootstrapServers, String flinkTopic, String mergerTopic) throws Exception{
 
-    private static void runConflux(String kafkaBootstrapServers, String outputTopic) throws Exception{
-
-        StreamExecutionEnvironment env = ConfluxPipeline.create(kafkaBootstrapServers, outputTopic);
+        StreamExecutionEnvironment env = ConfluxPipeline.create(kafkaBootstrapServers, flinkTopic);
         int pathNum = ConfluxPipeline.getPathNum();
-        KafkaAdminUtils.createTopic(kafkaBootstrapServers, outputTopic, pathNum);
+        Log.info(String.format("Found %d path in execution graph", pathNum));
 
-
+        KafkaAdminUtils.createTopic(kafkaBootstrapServers, flinkTopic, pathNum);
+        KafkaAdminUtils.createTopic(kafkaBootstrapServers, mergerTopic, 1);
 
         //todo: move K-way merger initialization to a separate start() function
 
-        ConcurrentLinkedQueue<kafkaMessage>[] queue = new ConcurrentLinkedQueue[pathNum];
-        for (int i = 0; i < pathNum; i++) {
-            queue[i] = new ConcurrentLinkedQueue<>();
-        }
-
-
-        ConcurrentHashMap<Integer, Long> watermarks = new ConcurrentHashMap<>();
 
         // Make producer, consumer, and merger
-        KafkaMergeThread mergeThread = new KafkaMergeThread(pathNum, queue, watermarks);
-        KafkaConsumerThread consumeThread = new KafkaConsumerThread(kafkaBootstrapServers, pathNum, queue, watermarks, outputTopic);
+        KafkaMergeThread mergeThread = new KafkaMergeThread(kafkaBootstrapServers, mergerTopic, pathNum);
+        KafkaConsumerThread consumeThread = new KafkaConsumerThread(kafkaBootstrapServers, pathNum, mergeThread.partitionQueue, mergeThread.watermarks, flinkTopic);
 
         Thread merge = new Thread(mergeThread);
         Thread consume = new Thread(consumeThread);
@@ -94,17 +115,11 @@ public class Main {
 
         try {
             env.execute();
-            Thread.sleep(10000);
+            mergeThread.join();
+            consumeThread.stopRunning();
         } catch (Exception e) {
             e.printStackTrace();
-        } finally {
-            System.out.println("Closing Consumer and producer");
-            consumeThread.stopRunning();
-
-            System.out.println("Stopping merge");
-            mergeThread.stopRunning();
         }
-
     }
 }
 

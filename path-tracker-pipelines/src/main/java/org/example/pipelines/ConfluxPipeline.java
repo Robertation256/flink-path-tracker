@@ -21,6 +21,8 @@ package org.example.pipelines;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.PipelineOptions;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -36,6 +38,8 @@ import org.example.operator.CustomWatermarkProcessor;
 import org.example.operator.QueueIdAssigner;
 import org.example.utils.KafkaAdminUtils;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Properties;
 
 public class ConfluxPipeline {
@@ -44,11 +48,15 @@ public class ConfluxPipeline {
 
     public static StreamExecutionEnvironment create(String kafkaBootstrapServer, String recordOutputTopic) throws Exception{
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        Configuration config = new Configuration();
+        config.set(PipelineOptions.AUTO_WATERMARK_INTERVAL, Duration.ofMillis(org.example.Configuration.WATERMARK_EMISSION_PERIOD_MILLIS));
+        env.configure(config);
+
 
         WatermarkStrategy<DecorateRecord> customWatermarkStrategy = new CustomWatermarkStrategy<>();
 
         DataStream<DecorateRecord> datasource = env
-                .addSource(new TestDataSource(100000)).setParallelism(1)
+                .addSource(new TestDataSource(org.example.Configuration.DATASOURCE_SIZE)).setParallelism(1)
                 .assignTimestampsAndWatermarks(customWatermarkStrategy).setParallelism(1);
         DataStream<DecorateRecord> recordStream = Workload.attachTestPipeline(datasource);
 
@@ -63,7 +71,12 @@ public class ConfluxPipeline {
                 .setParallelism(1)
                 .keyBy(r -> 1)
                 .process(new QueueIdAssigner(pathNum)).setParallelism(1)
-                .sinkTo(getRecordSink(kafkaBootstrapServer, recordOutputTopic)).setParallelism(1);
+                .keyBy(DecorateRecord::getQueueId)
+                .map(record -> {
+                    record.setSinkTime(Instant.now().toEpochMilli());
+                    return record;
+                }).setParallelism(pathNum)
+                .sinkTo(getRecordSink(kafkaBootstrapServer, recordOutputTopic)).setParallelism(pathNum);
 
 
 

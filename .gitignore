@@ -67,3 +67,4 @@ tools/japicmp-output
 /docs/.hugo_build.lock
 latency.txt
 throughput.txt
+output_records.csv

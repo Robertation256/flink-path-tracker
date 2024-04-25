@@ -18,39 +18,39 @@
 
 package org.example.merger;
 
+import com.esotericsoftware.minlog.Log;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.example.datasource.DecorateRecord;
 import org.example.utils.RecordSerdes;
-
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class KafkaConsumerThread implements Runnable{
+public class KafkaConsumerThread extends Thread{
         private volatile boolean running = true;
         private int partitionCount;
         Consumer<byte[], byte []> consumer;
-        private final ConcurrentLinkedQueue<kafkaMessage> [] partitionQueue;
+        private final ConcurrentLinkedQueue<DecorateRecord> [] partitionQueue;
         ConcurrentHashMap<Integer, Long> watermarks;
         long recordsReceived = 0;
 
 
-    public KafkaConsumerThread(String bootstrapServer , int partitionCount, ConcurrentLinkedQueue<kafkaMessage>[] queue,  ConcurrentHashMap<Integer, Long> watermarks, String topicName) {
+    public KafkaConsumerThread(String bootstrapServer , int partitionCount, ConcurrentLinkedQueue<DecorateRecord>[] queue,  ConcurrentHashMap<Integer, Long> watermarks, String topicName) {
             this.partitionCount = partitionCount;
             Properties consumerProps = new Properties();
             consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
             consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "test_group_id");
             consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
             consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+            consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
             this.consumer = new KafkaConsumer<>(consumerProps);
             this.consumer.subscribe(Collections.singletonList(topicName));
             this.partitionQueue = queue;
@@ -64,19 +64,16 @@ public class KafkaConsumerThread implements Runnable{
         public void run() {
             while (running) {
                 int pollTimeMilli = 100;
-                ConsumerRecords<byte [], byte []> records = consumer.poll(Duration.ofMillis(pollTimeMilli));
-                for (ConsumerRecord<byte [], byte []> record : records) {
-                    DecorateRecord curr_record = RecordSerdes.fromBytes(record.value());
-                    if (curr_record.isDummyWatermark()) {
-                        updateWatermark(curr_record.getSeqNum(), record.partition());
+                ConsumerRecords<byte [], byte []> consumerRecords = consumer.poll(Duration.ofMillis(pollTimeMilli));
+                for (ConsumerRecord<byte [], byte []> consumerRecord : consumerRecords) {
+                    DecorateRecord record = RecordSerdes.fromBytes(consumerRecord.value());
+                    record.setConsumeTime(Instant.now().toEpochMilli());
+                    if (record.isDummyWatermark()) {
+                        updateWatermark(record.getSeqNum(), consumerRecord.partition());
                     } else {
-                        updateWatermark(curr_record.getSeqNum(), record.partition());
+//                        updateWatermark(record.getSeqNum(), consumerRecord.partition());
                         recordsReceived++;
-                        kafkaMessage message = new kafkaMessage(
-                                curr_record.getSeqNum(),
-                                1,
-                                System.currentTimeMillis());
-                        partitionQueue[record.partition()].offer(message);
+                        partitionQueue[consumerRecord.partition()].offer(record);
                     }
                     }
                 consumer.commitSync();
@@ -86,15 +83,13 @@ public class KafkaConsumerThread implements Runnable{
 
         public void updateWatermark(long watermarkValue, int pathID) {
             if(watermarks.get(pathID) < watermarkValue) {
-//                System.out.println(
-//                        "For path: " + pathID + " Updating watermark to " + watermarkValue);
                 watermarks.put(pathID, watermarkValue);
             }
         }
 
         public void stopRunning() {
             running = false;
-            System.out.println("Records received " + recordsReceived);
+            Log.info("Shutting down K-way merger consumer thread. Total number of records received: " + recordsReceived);
         }
         public void close() {
             this.consumer.close();

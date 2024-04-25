@@ -24,9 +24,12 @@ import org.example.datasource.DecorateRecord;
 public class TestRichMapFunctionImplForMul2 extends DecorateRichMapFunction {
     @Override
     public DecorateRecord map(DecorateRecord record) throws Exception {
+        long cycles = Configuration.OPERATOR_WORKLOAD_CYCLES;
+        while (cycles > 0){
+            cycles--;
+        }
 
         record.addAndSetPathInfo(instanceID);
-        Thread.sleep(Configuration.OPERATOR_SLEEP_MILLIS);
 
         // todo: either insert real workload or reduce all operators to dummy workload with induced sleep
         return record;

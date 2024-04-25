@@ -19,17 +19,74 @@
 package org.example.datasource;
 
 import org.example.Configuration;
-import org.testcontainers.shaded.org.bouncycastle.util.Strings;
-
 import java.util.Arrays;
 
 public class DecorateRecord {
     private final boolean isDummyWatermark;
-    private Long seqNum;
+    private long seqNum;
     private byte[] payload;
     private String pathInfo;
 
     private int queueId = -1;
+
+    private long createTime;
+    private long processCompletionTime;
+    private long sinkTime;
+    private long consumeTime;
+    private long heapPushTime;
+    private long emitTime;
+
+    public long getProcessCompletionTime() {
+        return processCompletionTime;
+    }
+
+    public void setProcessCompletionTime(long processCompletionTime) {
+        this.processCompletionTime = processCompletionTime;
+    }
+
+
+    public long getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(long createTime) {
+        this.createTime = createTime;
+    }
+
+    public long getSinkTime() {
+        return sinkTime;
+    }
+
+    public void setSinkTime(long sinkTime) {
+        this.sinkTime = sinkTime;
+    }
+
+    public long getConsumeTime() {
+        return consumeTime;
+    }
+
+    public void setConsumeTime(long consumeTime) {
+        this.consumeTime = consumeTime;
+    }
+
+    public long getHeapPushTime() {
+        return heapPushTime;
+    }
+
+    public void setHeapPushTime(long heapPushTime) {
+        this.heapPushTime = heapPushTime;
+    }
+
+    public long getEmitTime() {
+        return emitTime;
+    }
+
+    public void setEmitTime(long emitTime) {
+        this.emitTime = emitTime;
+    }
+
+
+
 
     public DecorateRecord(long seqNum, String pathInfo) {
         this.seqNum = seqNum;
@@ -95,10 +152,16 @@ public class DecorateRecord {
     @Override
     public String toString() {
         return String.format(
-                "{IsWatermark=%b SeqNumber=%d, PathInfo=(%s), Payload=%s}",
+                "{IsWatermark=%b SeqNumber=%d, PathInfo=(%s), CreateTime=%d, ProcessCompletionTime=%d, SinkTime=%d, ConsumeTime=%d, HeapPushTime=%d, EmitTime=%d, Payload=%s}",
                 this.isDummyWatermark,
                 this.getSeqNum(),
                 this.getPathInfo(),
+                this.getCreateTime(),
+                this.getProcessCompletionTime(),
+                this.getSinkTime(),
+                this.getConsumeTime(),
+                this.getHeapPushTime(),
+                this.getEmitTime(),
                 Arrays.toString(this.payload));
     }
 }
