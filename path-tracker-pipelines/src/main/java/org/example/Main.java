@@ -18,12 +18,10 @@
 
 package org.example;
 
-
-
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
-import org.example.merger.KafkaConsumerThread;
+import org.example.merger.KWayMergerConsumer;
 import org.example.merger.KafkaMergeThread;
 import org.example.pipelines.ConfluxPipeline;
 import org.example.pipelines.GlobalSortPipeline;
@@ -68,9 +66,9 @@ public class Main {
         if (runBaseline){
             runBaseline(bootstrapServers, flinkTopic);
         }
-        else if (runMerger){
-            runMerger(bootstrapServers, flinkTopic, mergerTopic);
-        }
+//        else if (runMerger){
+//            runMerger(bootstrapServers, flinkTopic, mergerTopic);
+//        }
         else {
             runConflux(bootstrapServers, flinkTopic, mergerTopic);
         }
@@ -97,50 +95,23 @@ public class Main {
 
         // Make producer, consumer, and merger
         KafkaMergeThread mergeThread = new KafkaMergeThread(kafkaBootstrapServers, mergerTopic, pathNum);
-        KafkaConsumerThread consumeThread = new KafkaConsumerThread(kafkaBootstrapServers, mergeThread.partitionQueue, flinkTopic);
 
         Thread merge = new Thread(mergeThread);
-        Thread consume = new Thread(consumeThread);
+        KWayMergerConsumer consumer = new KWayMergerConsumer(kafkaBootstrapServers, flinkTopic, mergeThread.partitionQueue);
 
 
-        consume.start();
+        consumer.run();
         merge.start();
 
         try {
             env.execute();
             mergeThread.join();
-
-            consumeThread.stopRunning();
+            consumer.stop();
         } catch (Exception e) {
             LOG.error("Encountered error {}", e.toString());
         }
     }
 
-
-    private static void runMerger(String kafkaBootstrapServers, String flinkTopic, String mergerTopic) throws Exception{
-        int pathNum = ConfluxPipeline.getPathNum();
-        LOG.info(String.format("Found %d path in execution graph", pathNum));
-
-        KafkaAdminUtils.createTopic(kafkaBootstrapServers, flinkTopic, pathNum);
-        KafkaAdminUtils.createTopic(kafkaBootstrapServers, mergerTopic, 1);
-
-
-        KafkaMergeThread mergeThread = new KafkaMergeThread(kafkaBootstrapServers, mergerTopic, pathNum);
-        KafkaConsumerThread consumeThread = new KafkaConsumerThread(kafkaBootstrapServers, mergeThread.partitionQueue, flinkTopic);
-
-        Thread merge = new Thread(mergeThread);
-        Thread consume = new Thread(consumeThread);
-
-        merge.setDaemon(true);
-        consume.setDaemon(true);
-
-        consume.start();
-        merge.start();
-
-
-        mergeThread.join();
-        consumeThread.stopRunning();
-    }
 }
 
 
