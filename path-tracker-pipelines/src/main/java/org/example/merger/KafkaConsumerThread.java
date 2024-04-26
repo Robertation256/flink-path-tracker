@@ -34,21 +34,19 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.BlockingQueue;
 
 public class KafkaConsumerThread extends Thread{
 
         private static final Logger LOG = LoggerFactory.getLogger(KafkaConsumerThread.class);
         private volatile boolean running = true;
-        private int partitionCount;
         Consumer<byte[], byte []> consumer;
-        private final ConcurrentLinkedQueue<DecorateRecord> [] partitionQueue;
+        private final BlockingQueue<DecorateRecord> [] partitionQueue;
         ConcurrentHashMap<Integer, Long> watermarks;
         long recordsReceived = 0;
 
 
-    public KafkaConsumerThread(String bootstrapServer , int partitionCount, ConcurrentLinkedQueue<DecorateRecord>[] queue,  ConcurrentHashMap<Integer, Long> watermarks, String topicName) {
-            this.partitionCount = partitionCount;
+    public KafkaConsumerThread(String bootstrapServer , BlockingQueue<DecorateRecord>[] queue, String topicName) {
             Properties consumerProps = new Properties();
             consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
             consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "test_group_id");
@@ -59,11 +57,11 @@ public class KafkaConsumerThread extends Thread{
             this.consumer = new KafkaConsumer<>(consumerProps);
             this.consumer.subscribe(Collections.singletonList(topicName));
             this.partitionQueue = queue;
-            this.watermarks = watermarks;
-
-            for(int i = 0; i < partitionCount; i++) {
-                watermarks.put(i, 0L); // Initialize all watermarks
-            }
+//            this.watermarks = watermarks;
+//
+//            for(int i = 0; i < partitionCount; i++) {
+//                watermarks.put(i, 0L); // Initialize all watermarks
+//            }
         }
         @Override
         public void run() {
@@ -73,13 +71,13 @@ public class KafkaConsumerThread extends Thread{
                 for (ConsumerRecord<byte [], byte []> consumerRecord : consumerRecords) {
                     DecorateRecord record = RecordSerdes.fromBytes(consumerRecord.value());
                     record.setConsumeTime(Instant.now().toEpochMilli());
-                    if (record.isDummyWatermark()) {
-                        updateWatermark(record.getSeqNum(), consumerRecord.partition());
-                    } else {
-                        updateWatermark(record.getSeqNum(), consumerRecord.partition());
+//                    if (record.isDummyWatermark()) {
+//                        updateWatermark(record.getSeqNum(), consumerRecord.partition());
+//                    } else {
+//                        updateWatermark(record.getSeqNum(), consumerRecord.partition());
                         recordsReceived++;
                         partitionQueue[consumerRecord.partition()].offer(record);
-                    }
+//                    }
                     }
                 consumer.commitSync();
                 }
