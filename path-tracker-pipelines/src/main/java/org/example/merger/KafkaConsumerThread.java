@@ -28,21 +28,18 @@ import org.example.datasource.DecorateRecord;
 import org.example.utils.RecordSerdes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Properties;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.BlockingQueue;
 
 public class KafkaConsumerThread extends Thread{
 
         private static final Logger LOG = LoggerFactory.getLogger(KafkaConsumerThread.class);
         private volatile boolean running = true;
-        Consumer<byte[], byte []> consumer;
+        private final Consumer<byte[], byte []> consumer;
         private final BlockingQueue<DecorateRecord> [] partitionQueue;
-        ConcurrentHashMap<Integer, Long> watermarks;
         long recordsReceived = 0;
 
 
@@ -57,12 +54,8 @@ public class KafkaConsumerThread extends Thread{
             this.consumer = new KafkaConsumer<>(consumerProps);
             this.consumer.subscribe(Collections.singletonList(topicName));
             this.partitionQueue = queue;
-//            this.watermarks = watermarks;
-//
-//            for(int i = 0; i < partitionCount; i++) {
-//                watermarks.put(i, 0L); // Initialize all watermarks
-//            }
         }
+
         @Override
         public void run() {
             while (running) {
@@ -71,30 +64,19 @@ public class KafkaConsumerThread extends Thread{
                 for (ConsumerRecord<byte [], byte []> consumerRecord : consumerRecords) {
                     DecorateRecord record = RecordSerdes.fromBytes(consumerRecord.value());
                     record.setConsumeTime(Instant.now().toEpochMilli());
-//                    if (record.isDummyWatermark()) {
-//                        updateWatermark(record.getSeqNum(), consumerRecord.partition());
-//                    } else {
-//                        updateWatermark(record.getSeqNum(), consumerRecord.partition());
+                    partitionQueue[consumerRecord.partition()].offer(record);
+                    if (!record.isDummyWatermark()){
                         recordsReceived++;
-                        partitionQueue[consumerRecord.partition()].offer(record);
-//                    }
                     }
-                consumer.commitSync();
                 }
-            close();
-        }
-
-        public void updateWatermark(long watermarkValue, int pathID) {
-            if(watermarks.get(pathID) < watermarkValue) {
-                watermarks.put(pathID, watermarkValue);
+                consumer.commitSync();
             }
+            consumer.close();
         }
 
         public void stopRunning() {
+            LOG.info("Shutting down K-way merger consumer thread. Total number of records received: {}", recordsReceived);
             running = false;
-            LOG.info("Shutting down K-way merger consumer thread. Total number of records received: " + recordsReceived);
         }
-        public void close() {
-            this.consumer.close();
-        }
+
 }

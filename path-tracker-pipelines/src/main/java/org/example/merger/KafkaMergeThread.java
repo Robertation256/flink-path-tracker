@@ -84,6 +84,7 @@ public class KafkaMergeThread extends   Thread {
             }
         } catch (Exception e){
             LOG.error("Failed to initialize heap with error: {}", e.toString());
+            return;
         }
         LOG.info("K-way merger heap initialized");
 
@@ -118,7 +119,7 @@ public class KafkaMergeThread extends   Thread {
 
 
 
-        LOG.info("Received final watermark from Flink. Shutting down merge thread.");
+        LOG.info("Received final watermark from Flink. Shutting down K-way merger merge thread.");
         LOG.info("Total number of records popped: {}", recordsEmitted) ;
 
     }

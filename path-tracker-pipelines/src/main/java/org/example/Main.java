@@ -61,7 +61,7 @@ public class Main {
             }
 
         }
-        
+
 
         LOG.info(String.format("Launching with configuration: isBaseline=%b, flink_topic=%s, merger_topic:%s, kafka_server=%s",runBaseline, flinkTopic, mergerTopic, bootstrapServers));
 
