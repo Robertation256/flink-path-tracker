@@ -71,12 +71,12 @@ public class ConfluxPipeline {
                 .setParallelism(1)
                 .keyBy(r -> 1)
                 .process(new QueueIdAssigner(pathNum)).setParallelism(1)
-                .keyBy(DecorateRecord::getQueueId)
+//                .keyBy(DecorateRecord::getQueueId)
                 .map(record -> {
                     record.setSinkTime(Instant.now().toEpochMilli());
                     return record;
-                }).setParallelism(pathNum)
-                .sinkTo(getRecordSink(kafkaBootstrapServer, recordOutputTopic)).setParallelism(pathNum);
+                }).setParallelism(1)
+                .sinkTo(getRecordSink(kafkaBootstrapServer, recordOutputTopic)).setParallelism(1);
 
 
 

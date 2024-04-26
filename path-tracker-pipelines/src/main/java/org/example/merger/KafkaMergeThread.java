@@ -18,22 +18,16 @@
 
 package org.example.merger;
 
-import com.esotericsoftware.minlog.Log;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.example.datasource.DecorateRecord;
 import org.example.utils.RecordSerdes;
-
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.List;
 import java.util.PriorityQueue;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,6 +35,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 
 public class KafkaMergeThread extends   Thread {
+    
+        private static final Logger LOG = LoggerFactory.getLogger(KafkaMergeThread.class.getName());
         private volatile boolean running = true;
         private final int partitionCount;
         public final ConcurrentLinkedQueue<DecorateRecord> [] partitionQueue;
@@ -80,22 +76,24 @@ public class KafkaMergeThread extends   Thread {
     }
         @Override
         public void run() {
-            Log.info("K-way merger merge thread started");
+            LOG.info("K-way merger merge thread started");
             init_heap(); // Push one value from each path onto the heap
             long lastCheckedWatermark = 0;
 
-            Log.info("K-way merger heap initialized");
+            LOG.info("K-way merger heap initialized");
 
             while (running && !isCompleted()) {
                 // Check if watermark has changed
                 long currWatermark = getSmallestWatermark();
 
-                if((lastCheckedWatermark != currWatermark) || (minHeap.size() == 0)) {
+                if((lastCheckedWatermark != currWatermark) || (minHeap.isEmpty())) {
                     refillHeap(); // Fill up heap with one value from every queue if it exists
                     lastCheckedWatermark = currWatermark;
                 } else {
                     refillHeap();
                 }
+
+
 
                 // Pop smallest item
                 if((minHeap.size() == partitionCount)) {
@@ -105,7 +103,7 @@ public class KafkaMergeThread extends   Thread {
                 }
             }
 
-            Log.info("Received final watermark from Flink. Shutting down merge thread.");
+            LOG.info("Received final watermark from Flink. Shutting down merge thread.");
             stopRunning();
         }
 
@@ -129,7 +127,7 @@ public class KafkaMergeThread extends   Thread {
         private boolean isCompleted(){
             // Flink announce signals a final watermark with Long.MAX_VALUE
 
-            if (getSmallestWatermark() != Long.MAX_VALUE || !minHeap.isEmpty()){
+            if (!minHeap.isEmpty() || getSmallestWatermark() != Long.MAX_VALUE){
                 return false;
             }
 
@@ -175,7 +173,7 @@ public class KafkaMergeThread extends   Thread {
 
         public void stopRunning() {
             running = false;
-            Log.info("Shutting down K-way merger merge thread. Total number of records popped: " + valuesPopped) ;
+            LOG.info("Shutting down K-way merger merge thread. Total number of records popped: " + valuesPopped) ;
         }
 
         public void emitRecord() {
@@ -183,7 +181,9 @@ public class KafkaMergeThread extends   Thread {
             smallest = minHeap.remove();
             smallest.record.setEmitTime(Instant.now().toEpochMilli());
             if (lastSeqNum > smallest.priority) {
-                Log.error("=========\nSafety Violation\n========== \n" + "Last seq Number: " + lastSeqNum + " Curr Seq Number " + smallest.priority);
+                LOG.error("Spotted safety Violation: last seq num: {}, current seq num: {}",
+                        lastSeqNum,
+                        smallest.priority);
                 stopRunning();
             } else {
                 lastSeqNum = smallest.priority;

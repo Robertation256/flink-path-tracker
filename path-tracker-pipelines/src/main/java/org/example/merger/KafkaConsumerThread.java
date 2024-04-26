@@ -18,7 +18,6 @@
 
 package org.example.merger;
 
-import com.esotericsoftware.minlog.Log;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -27,6 +26,9 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.example.datasource.DecorateRecord;
 import org.example.utils.RecordSerdes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
@@ -35,6 +37,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class KafkaConsumerThread extends Thread{
+
+        private static final Logger LOG = LoggerFactory.getLogger(KafkaConsumerThread.class);
         private volatile boolean running = true;
         private int partitionCount;
         Consumer<byte[], byte []> consumer;
@@ -48,6 +52,7 @@ public class KafkaConsumerThread extends Thread{
             Properties consumerProps = new Properties();
             consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
             consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "test_group_id");
+            consumerProps.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 100000);
             consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
             consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
             consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
@@ -71,7 +76,7 @@ public class KafkaConsumerThread extends Thread{
                     if (record.isDummyWatermark()) {
                         updateWatermark(record.getSeqNum(), consumerRecord.partition());
                     } else {
-//                        updateWatermark(record.getSeqNum(), consumerRecord.partition());
+                        updateWatermark(record.getSeqNum(), consumerRecord.partition());
                         recordsReceived++;
                         partitionQueue[consumerRecord.partition()].offer(record);
                     }
@@ -89,7 +94,7 @@ public class KafkaConsumerThread extends Thread{
 
         public void stopRunning() {
             running = false;
-            Log.info("Shutting down K-way merger consumer thread. Total number of records received: " + recordsReceived);
+            LOG.info("Shutting down K-way merger consumer thread. Total number of records received: " + recordsReceived);
         }
         public void close() {
             this.consumer.close();
