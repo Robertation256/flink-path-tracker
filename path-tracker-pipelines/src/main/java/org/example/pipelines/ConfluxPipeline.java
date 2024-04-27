@@ -44,7 +44,7 @@ import java.util.Properties;
 
 public class ConfluxPipeline {
 
-    private static Map<String, Integer> pathIdToQueueId;
+    private static Map<String, Integer> pathIdToQueueId = null;
 
     public static StreamExecutionEnvironment create(String kafkaBootstrapServer, String recordOutputTopic) throws Exception{
         pathIdToQueueId = new HashMap<>();
@@ -94,7 +94,7 @@ public class ConfluxPipeline {
     }
 
     public static int getPathNum() throws  Exception{
-        if (pathIdToQueueId.isEmpty()){
+        if (pathIdToQueueId == null){
             create("", "");
         }
         return pathIdToQueueId.size();

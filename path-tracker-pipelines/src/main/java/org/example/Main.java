@@ -66,31 +66,38 @@ public class Main {
         if (runBaseline){
             runBaseline(bootstrapServers, flinkTopic);
         }
-//        else if (runMerger){
-//            runMerger(bootstrapServers, flinkTopic, mergerTopic);
-//        }
+        else if (runMerger){
+            runMerger(bootstrapServers, flinkTopic, mergerTopic);
+        }
         else {
-            runConflux(bootstrapServers, flinkTopic, mergerTopic);
+            runConflux(bootstrapServers, flinkTopic);
         }
     }
 
     private static void runBaseline(String kafkaServers, String outputTopic) throws Exception{
+        KafkaAdminUtils.createTopic(kafkaServers, outputTopic, 1);
         StreamExecutionEnvironment env = GlobalSortPipeline.create(kafkaServers, outputTopic);
         env.execute();
     }
 
 
 
-    private static void runConflux(String kafkaBootstrapServers, String flinkTopic, String mergerTopic) throws Exception{
-
+    private static void runConflux(String kafkaBootstrapServers, String flinkTopic) throws Exception{
         StreamExecutionEnvironment env = ConfluxPipeline.create(kafkaBootstrapServers, flinkTopic);
+        try {
+            env.execute();
+        } catch (Exception e) {
+            LOG.error("Encountered error {}", e.toString());
+        }
+    }
+
+
+    private static void runMerger(String kafkaBootstrapServers, String flinkTopic, String mergerTopic) throws  Exception{
         int pathNum = ConfluxPipeline.getPathNum();
         LOG.info(String.format("Found %d path in execution graph", pathNum));
 
         KafkaAdminUtils.createTopic(kafkaBootstrapServers, flinkTopic, pathNum);
         KafkaAdminUtils.createTopic(kafkaBootstrapServers, mergerTopic, 1);
-
-        //todo: move K-way merger initialization to a separate start() function
 
 
         // Make producer, consumer, and merger
@@ -103,13 +110,8 @@ public class Main {
         consumer.run();
         merge.start();
 
-        try {
-            env.execute();
-            mergeThread.join();
-            consumer.stop();
-        } catch (Exception e) {
-            LOG.error("Encountered error {}", e.toString());
-        }
+        merge.join();
+        consumer.stop();
     }
 
 }

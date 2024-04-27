@@ -21,11 +21,14 @@ package org.example.utils;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.Properties;
 
 public class KafkaAdminUtils {
+    private static final Logger LOG = LoggerFactory.getLogger(KafkaAdminUtils.class);
 
     public static void createTopic(String kafkaBootstrapServers, String topic, int pathNum){
         Properties prop = new Properties();
@@ -34,10 +37,10 @@ public class KafkaAdminUtils {
         try (AdminClient adminClient = AdminClient.create(prop)) {
             NewTopic newTopic = new NewTopic(topic, pathNum, (short) 1);
             adminClient.createTopics(Collections.singleton(newTopic)).all().get();
-            System.out.println("Topic created successfully");
+            LOG.info("Topic {} created successfully.", topic);
         } catch (Exception e) {
-            System.out.println("Topic probbably exists");
-            e.printStackTrace();
+            LOG.error("Failed to create topic {} due to error {}", topic, e.toString());
+            System.exit(1);
         }
     }
 }
