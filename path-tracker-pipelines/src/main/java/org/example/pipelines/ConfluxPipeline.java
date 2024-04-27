@@ -35,18 +35,20 @@ import org.example.datasource.CustomWatermarkStrategy;
 import org.example.datasource.DecorateRecord;
 import org.example.datasource.TestDataSource;
 import org.example.operator.CustomWatermarkProcessor;
-import org.example.operator.QueueIdAssigner;
-import org.example.utils.KafkaAdminUtils;
 
 import java.time.Duration;
-import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 public class ConfluxPipeline {
 
-    private static int pathNum = -1;
+    private static Map<String, Integer> pathIdToQueueId;
 
     public static StreamExecutionEnvironment create(String kafkaBootstrapServer, String recordOutputTopic) throws Exception{
+        pathIdToQueueId = new HashMap<>();
+
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         Configuration config = new Configuration();
         config.set(PipelineOptions.AUTO_WATERMARK_INTERVAL, Duration.ofMillis(org.example.Configuration.WATERMARK_EMISSION_PERIOD_MILLIS));
@@ -60,43 +62,51 @@ public class ConfluxPipeline {
                 .assignTimestampsAndWatermarks(customWatermarkStrategy).setParallelism(1);
         DataStream<DecorateRecord> recordStream = Workload.attachTestPipeline(datasource);
 
-        // checking path num util this point is good enough since the later operators have parallelism=1
-        pathNum = PathAnalyzer.computePathNum(env);
 
 
-        recordStream
+        CustomWatermarkProcessor watermarkProcessor = new CustomWatermarkProcessor();
+
+        int upstreamParallelism = recordStream.getParallelism();
+        DataStream<DecorateRecord> streamWithWatermark = recordStream
+                .forward()
                 .transform("watermark-extraction",
                         TypeInformation.of(new TypeHint<DecorateRecord>() {}),
-                        new CustomWatermarkProcessor())
-                .setParallelism(1)
-                .keyBy(r -> 1)
-                .process(new QueueIdAssigner(pathNum)).setParallelism(1)
-//                .keyBy(DecorateRecord::getQueueId)
-                .map(record -> {
-                    record.setSinkTime(Instant.now().toEpochMilli());
-                    return record;
-                }).setParallelism(1)
-                .sinkTo(getRecordSink(kafkaBootstrapServer, recordOutputTopic)).setParallelism(1);
+                        watermarkProcessor
+                ).setParallelism(upstreamParallelism);
 
 
+
+
+        streamWithWatermark
+                .forward()
+                .sinkTo(getRecordSink(kafkaBootstrapServer, recordOutputTopic))
+                .setParallelism(upstreamParallelism);
+
+
+        List<String> pathIds = PathAnalyzer.computePathIDs(env);
+        for (int i=0; i<pathIds.size(); i++){
+            pathIdToQueueId.put(pathIds.get(i), i);
+        }
+
+        watermarkProcessor.setPathIds(pathIds);
 
         return env;
     }
 
     public static int getPathNum() throws  Exception{
-        if (pathNum < 0){
+        if (pathIdToQueueId.isEmpty()){
             create("", "");
         }
-        return pathNum;
+        return pathIdToQueueId.size();
     }
 
     private static KafkaSink<DecorateRecord> getRecordSink(String kafkaServer, String topic){
         Properties producerProps = new Properties();
-        producerProps.put(ProducerConfig.PARTITIONER_CLASS_CONFIG, "org.example.utils.CustomKafkaPartitioner");
+//        producerProps.put(ProducerConfig.PARTITIONER_CLASS_CONFIG, "org.example.utils.CustomKafkaPartitioner");
 
         return KafkaSink.<DecorateRecord>builder()
                 .setBootstrapServers(kafkaServer)
-                .setRecordSerializer(new CustomKafkaSerializer(topic))
+                .setRecordSerializer(new CustomKafkaSerializer(topic, pathIdToQueueId))
                 .setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE)
                 .setKafkaProducerConfig(producerProps)
                 .build();

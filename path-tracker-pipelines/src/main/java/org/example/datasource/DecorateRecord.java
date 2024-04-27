@@ -25,7 +25,7 @@ public class DecorateRecord {
     private final boolean isDummyWatermark;
     private long seqNum;
     private byte[] payload;
-    private String pathInfo;
+    private String pathInfo = "";
 
     private int queueId = -1;
 
@@ -121,13 +121,16 @@ public class DecorateRecord {
     public int getQueueId(){return queueId;}
 
     // TODO: use xor to compress path information?
-    public void addAndSetPathInfo(String vertexID) {
-        this.pathInfo = String.format("%s-%s", this.pathInfo, vertexID);
+    public void addAndSetPathInfo(String taskName, int subTaskId) {
+        if (this.pathInfo.isEmpty()){
+            this.pathInfo = String.format("%s_%d", taskName, subTaskId);
+        }
+        else {
+            this.pathInfo = this.pathInfo + "-" + String.format("%s_%d", taskName, subTaskId);
+        }
     }
 
-    public String addPathInfo(String vertexID) {
-        return String.format("%s-%s", this.pathInfo, vertexID);
-    }
+
 
     public void setPathInfo(String pathInfo) {
         this.pathInfo = pathInfo;

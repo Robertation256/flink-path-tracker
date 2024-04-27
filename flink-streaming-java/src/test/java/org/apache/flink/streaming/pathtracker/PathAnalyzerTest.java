@@ -28,6 +28,7 @@ import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.junit.Test;
 
 import java.util.Collections;
+import java.util.List;
 
 /** Test for {@link PathAnalyzer}. */
 public class PathAnalyzerTest {
@@ -55,7 +56,8 @@ public class PathAnalyzerTest {
                 .setParallelism(4)
                 .addSink(new DiscardingSink<>());
 
-        int pathNum = PathAnalyzer.computePathNum(env);
-        assert (pathNum == 12);
+        List<String> pathIds = PathAnalyzer.computePathIDs(env);
+        System.out.println(pathIds);
+        assert (pathIds.size() == 12);
     }
 }

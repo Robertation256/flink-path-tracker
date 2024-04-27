@@ -29,6 +29,10 @@ import org.example.utils.RecordSerdes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+
 
 public class CustomKafkaSerializer implements
         KafkaRecordSerializationSchema<DecorateRecord> {
@@ -37,21 +41,34 @@ public class CustomKafkaSerializer implements
     private static final Logger LOG = LoggerFactory.getLogger(CustomKafkaSerializer.class);
 
     private final String topic;
+    private final Map<String, Integer> pathIdToQueueId;
 
 
     public CustomKafkaSerializer(String topic)
     {
         this.topic = topic;
+        this.pathIdToQueueId = new HashMap<>();
+    }
+
+    public CustomKafkaSerializer(String topic, Map<String, Integer> pathIdToQueueId)
+    {
+        this.topic = topic;
+        this.pathIdToQueueId = pathIdToQueueId;
     }
 
     @Override
     public ProducerRecord<byte[], byte[]> serialize(
             DecorateRecord element, KafkaSinkContext context, Long timestamp) {
 
+
         try {
+            int queueId = pathIdToQueueId.getOrDefault(element.getPathInfo(), 0);
+            element.setSinkTime(Instant.now().toEpochMilli());
+
             return new ProducerRecord<>(
                     topic,
-                    Ints.toByteArray(element.getQueueId()) ,
+                    queueId,
+                    Ints.toByteArray(queueId) ,
                     RecordSerdes.toBytes(element)
             );
         } catch (Exception e) {

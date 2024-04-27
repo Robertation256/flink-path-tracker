@@ -18,10 +18,14 @@
 
 package org.example.operator;
 
+import org.apache.flink.api.common.functions.AbstractRichFunction;
+
+import org.apache.flink.api.common.functions.FilterFunction;
+
 import org.example.Configuration;
 import org.example.datasource.DecorateRecord;
 
-public class TestRichFilterFunctionImpl extends DecorateRichFilterFunction {
+public class TestRichFilterFunctionImpl extends AbstractRichFunction implements FilterFunction<DecorateRecord> {
     @Override
     public boolean filter(DecorateRecord record) throws Exception {
         long cycles = Configuration.OPERATOR_WORKLOAD_CYCLES;
@@ -29,11 +33,8 @@ public class TestRichFilterFunctionImpl extends DecorateRichFilterFunction {
             cycles--;
         }
 
-        if (record.getSeqNum() % 7 == 0) {
-            return false;
-        }
+        record.addAndSetPathInfo(getRuntimeContext().getTaskInfo().getTaskName(), getRuntimeContext().getTaskInfo().getIndexOfThisSubtask());
 
-        record.addAndSetPathInfo(instanceID);
-        return true;
+        return record.getSeqNum() % 7 != 0;
     }
 }

@@ -29,7 +29,6 @@ import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.OpenContext;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
-import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.PipelineOptions;
 import org.apache.flink.connector.base.DeliveryGuarantee;
@@ -43,18 +42,14 @@ import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindo
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
 
-import org.apache.kafka.clients.producer.ProducerConfig;
 import org.example.CustomKafkaSerializer;
 import org.example.datasource.CustomWatermarkStrategy;
 import org.example.datasource.DecorateRecord;
 import org.example.datasource.TestDataSource;
-import org.example.operator.TestRichFilterFunctionImpl;
-import org.example.operator.TestRichMapFunctionImplForMul2;
-import org.example.operator.TestRichMapFunctionImplForSquare;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Properties;
 
 
 public class GlobalSortPipeline {
@@ -191,7 +186,6 @@ public class GlobalSortPipeline {
                 });
 
                 for (DecorateRecord record: buffer){
-                    record.setSinkTime(Instant.now().toEpochMilli());
                     out.collect(record);
                 }
             }
