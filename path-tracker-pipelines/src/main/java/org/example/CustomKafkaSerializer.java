@@ -41,13 +41,12 @@ public class CustomKafkaSerializer implements
     private static final Logger LOG = LoggerFactory.getLogger(CustomKafkaSerializer.class);
 
     private final String topic;
-    private final Map<String, Integer> pathIdToQueueId;
+    private  Map<String, Integer> pathIdToQueueId = null;
 
 
     public CustomKafkaSerializer(String topic)
     {
         this.topic = topic;
-        this.pathIdToQueueId = new HashMap<>();
     }
 
     public CustomKafkaSerializer(String topic, Map<String, Integer> pathIdToQueueId)
@@ -62,13 +61,21 @@ public class CustomKafkaSerializer implements
 
 
         try {
-            int queueId = pathIdToQueueId.getOrDefault(element.getPathInfo(), 0);
+
+            if (pathIdToQueueId != null){
+                if (!pathIdToQueueId.containsKey(element.getPathInfo())){
+                    LOG.error("Failed to decide queue for record: {}", element);
+                    System.exit(1);
+                }
+                element.setQueueId(pathIdToQueueId.get(element.getPathInfo()));
+            }
+
             element.setSinkTime(Instant.now().toEpochMilli());
 
             return new ProducerRecord<>(
                     topic,
-                    queueId,
-                    Ints.toByteArray(queueId) ,
+                    element.getQueueId(),
+                    Ints.toByteArray(element.getQueueId()) ,
                     RecordSerdes.toBytes(element)
             );
         } catch (Exception e) {

@@ -23,6 +23,7 @@ import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.example.merger.KWayMergerConsumer;
 import org.example.merger.KafkaMergeThread;
+import org.example.metric.MetricConsumer;
 import org.example.pipelines.ConfluxPipeline;
 import org.example.pipelines.GlobalSortPipeline;
 import org.example.utils.KafkaAdminUtils;
@@ -41,9 +42,11 @@ public class Main {
         // default to launching conflux if not specified
         boolean runBaseline = Arrays.asList(args).contains("runBaseline");
         boolean runMerger = Arrays.asList(args).contains("runMerger");
+        boolean runMetric = Arrays.asList(args).contains("runMetric");
         String flinkTopic = UUID.randomUUID().toString().substring(0,10);
         String mergerTopic = UUID.randomUUID().toString().substring(0,10);
-        String bootstrapServers = "localhost:9092";
+        String metricTopic = "";
+        String bootstrapServers = "sp24-cs525-2118.cs.illinois.edu:9092";
 
         for (String arg: args){
             if (arg.contains("flink_topic=")){
@@ -57,6 +60,9 @@ public class Main {
             if (arg.contains("kafka_server=")){
                 bootstrapServers = arg.split("=")[1];
             }
+            if (arg.contains("metric_topic=")){
+                metricTopic = arg.split("=")[1];
+            }
 
         }
 
@@ -68,6 +74,9 @@ public class Main {
         }
         else if (runMerger){
             runMerger(bootstrapServers, flinkTopic, mergerTopic);
+        }
+        else if (runMetric){
+            MetricConsumer.run(bootstrapServers, metricTopic);
         }
         else {
             runConflux(bootstrapServers, flinkTopic);

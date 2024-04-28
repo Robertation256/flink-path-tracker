@@ -27,7 +27,7 @@ import org.example.datasource.DecorateRecord;
 
 public class TestRichFilterFunctionImpl extends AbstractRichFunction implements FilterFunction<DecorateRecord> {
     @Override
-    public boolean filter(DecorateRecord record) throws Exception {
+    public boolean filter(DecorateRecord record) {
         long cycles = Configuration.OPERATOR_WORKLOAD_CYCLES;
         while (cycles > 0){
             cycles--;

@@ -29,10 +29,11 @@ import java.time.Instant;
 public class Workload {
 
     public static DataStream<DecorateRecord> attachTestPipeline(DataStream<DecorateRecord> datasource){
-        return datasource.filter(new TestRichFilterFunctionImpl()).setParallelism(4)
-                .rebalance()
+        return datasource
+                .filter(new TestRichFilterFunctionImpl()).setParallelism(15)
+                .forward()
                 // multiply by 2
-                .map(new TestRichMapFunction()).setParallelism(4)
+                .map(new TestRichMapFunction()).setParallelism(15)
                 .rebalance()
                 // square it
                 .map(new TestRichMapFunction()).setParallelism(2)

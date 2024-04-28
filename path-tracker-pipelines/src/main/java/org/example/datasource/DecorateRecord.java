@@ -122,13 +122,16 @@ public class DecorateRecord {
 
     // TODO: use xor to compress path information?
     public void addAndSetPathInfo(String taskName, int subTaskId) {
+        String pathId = String.format("%s_%d", taskName, subTaskId);
         if (this.pathInfo.isEmpty()){
-            this.pathInfo = String.format("%s_%d", taskName, subTaskId);
+            this.pathInfo = pathId;
         }
-        else {
-            this.pathInfo = this.pathInfo + "-" + String.format("%s_%d", taskName, subTaskId);
+        // avoid duplicate task ids resulting from operator chaining
+        else if (!this.pathInfo.endsWith(pathId)){
+            this.pathInfo = this.pathInfo + "-" + pathId;
         }
     }
+
 
 
 

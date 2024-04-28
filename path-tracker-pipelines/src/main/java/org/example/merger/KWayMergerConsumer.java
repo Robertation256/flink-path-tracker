@@ -32,6 +32,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -56,8 +57,8 @@ public class KWayMergerConsumer {
     public void run() {
         Properties consumerProps = new Properties();
         consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaServer);
-        consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "test_group_id");
-        consumerProps.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 100000);
+        consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, UUID.randomUUID().toString().substring(0, 10));
+        consumerProps.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1000);
         consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
         consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
         consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
