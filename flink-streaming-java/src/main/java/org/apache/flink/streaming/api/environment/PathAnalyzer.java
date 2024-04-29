@@ -33,6 +33,7 @@ import org.apache.flink.streaming.api.graph.StreamEdge;
 import org.apache.flink.streaming.api.graph.StreamGraph;
 import org.apache.flink.streaming.api.graph.StreamNode;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -40,7 +41,7 @@ import java.util.concurrent.Executors;
 /** Utility for counting the number of data path in a physical execution graph. */
 public class PathAnalyzer {
 
-    public static Integer computePathNum(StreamExecutionEnvironment env) throws Exception {
+    public static List<String> computePathIDs(StreamExecutionEnvironment env) throws Exception {
         StreamGraph streamGraph = env.getStreamGraph(false);
         verifyStreamGraph(streamGraph);
 
@@ -67,16 +68,18 @@ public class PathAnalyzer {
         ExecutionVertex[] srcExecutionVertices = srcExecutionJobVertex.getTaskVertices();
 
         ExecutionVertex srcExecutionVertex = srcExecutionVertices[0];
-        return dfs(srcExecutionVertex);
+        List<String> pathIds = new ArrayList<>();
+        dfs(srcExecutionVertex, new ArrayList<>(), pathIds);
+        return pathIds;
     }
 
-    private static int dfs(ExecutionVertex v) {
+    private static void dfs(ExecutionVertex v, List<String> path, List<String> result) {
         // reached sink vertex
         if (v.getProducedPartitions().isEmpty()) {
-            return 1;
+            result.add(String.join("-", path));
+            return;
         }
 
-        int pathNum = 0;
         for (IntermediateResultPartitionID pid : v.getProducedPartitions().keySet()) {
             List<ConsumerVertexGroup> vertexGroups =
                     v.getExecutionGraphAccessor()
@@ -86,12 +89,12 @@ public class PathAnalyzer {
                 for (ExecutionVertexID vertexID : group) {
                     ExecutionVertex vertex =
                             v.getExecutionGraphAccessor().getExecutionVertexOrThrow(vertexID);
-                    pathNum += dfs(vertex);
+                    path.add(String.format("%s_%d", vertex.getTaskName(), vertex.getParallelSubtaskIndex()));
+                    dfs(vertex, path, result);
+                    path.remove(path.size()-1);
                 }
             }
         }
-
-        return pathNum;
     }
 
     // verify that the stream graph has one source parallel instance and does not diverge

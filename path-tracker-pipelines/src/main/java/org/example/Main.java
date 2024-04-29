@@ -18,28 +18,19 @@
 
 package org.example;
 
-import com.esotericsoftware.minlog.Log;
-
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
-import org.example.datasource.DecorateRecord;
-import org.example.merger.KafkaConsumerThread;
+import org.example.merger.KWayMergerConsumer;
 import org.example.merger.KafkaMergeThread;
-import org.example.merger.kafkaMessage;
+import org.example.metric.MetricConsumer;
 import org.example.pipelines.ConfluxPipeline;
 import org.example.pipelines.GlobalSortPipeline;
 import org.example.utils.KafkaAdminUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.KafkaContainer;
-import org.testcontainers.utility.DockerImageName;
-
 import java.util.Arrays;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Main {
     public static final Logger LOG = LoggerFactory.getLogger(Main.class);
@@ -50,9 +41,12 @@ public class Main {
 
         // default to launching conflux if not specified
         boolean runBaseline = Arrays.asList(args).contains("runBaseline");
+        boolean runMerger = Arrays.asList(args).contains("runMerger");
+        boolean runMetric = Arrays.asList(args).contains("runMetric");
         String flinkTopic = UUID.randomUUID().toString().substring(0,10);
         String mergerTopic = UUID.randomUUID().toString().substring(0,10);
-        String bootstrapServers = "localhost:9092";
+        String metricTopic = "";
+        String bootstrapServers = "sp24-cs525-2118.cs.illinois.edu:9092";
 
         for (String arg: args){
             if (arg.contains("flink_topic=")){
@@ -66,61 +60,69 @@ public class Main {
             if (arg.contains("kafka_server=")){
                 bootstrapServers = arg.split("=")[1];
             }
+            if (arg.contains("metric_topic=")){
+                metricTopic = arg.split("=")[1];
+            }
 
         }
 
 
         LOG.info(String.format("Launching with configuration: isBaseline=%b, flink_topic=%s, merger_topic:%s, kafka_server=%s",runBaseline, flinkTopic, mergerTopic, bootstrapServers));
 
-
         if (runBaseline){
             runBaseline(bootstrapServers, flinkTopic);
         }
+        else if (runMerger){
+            runMerger(bootstrapServers, flinkTopic, mergerTopic);
+        }
+        else if (runMetric){
+            MetricConsumer.run(bootstrapServers, metricTopic);
+        }
         else {
-            runConflux(bootstrapServers, flinkTopic, mergerTopic);
+            runConflux(bootstrapServers, flinkTopic);
         }
     }
 
     private static void runBaseline(String kafkaServers, String outputTopic) throws Exception{
+        KafkaAdminUtils.createTopic(kafkaServers, outputTopic, 1);
         StreamExecutionEnvironment env = GlobalSortPipeline.create(kafkaServers, outputTopic);
         env.execute();
     }
 
 
 
-    private static void runConflux(String kafkaBootstrapServers, String flinkTopic, String mergerTopic) throws Exception{
-
+    private static void runConflux(String kafkaBootstrapServers, String flinkTopic) throws Exception{
         StreamExecutionEnvironment env = ConfluxPipeline.create(kafkaBootstrapServers, flinkTopic);
+        try {
+            env.execute();
+        } catch (Exception e) {
+            LOG.error("Encountered error {}", e.toString());
+        }
+    }
+
+
+    private static void runMerger(String kafkaBootstrapServers, String flinkTopic, String mergerTopic) throws  Exception{
         int pathNum = ConfluxPipeline.getPathNum();
-        Log.info(String.format("Found %d path in execution graph", pathNum));
+        LOG.info(String.format("Found %d path in execution graph", pathNum));
 
         KafkaAdminUtils.createTopic(kafkaBootstrapServers, flinkTopic, pathNum);
         KafkaAdminUtils.createTopic(kafkaBootstrapServers, mergerTopic, 1);
 
-        //todo: move K-way merger initialization to a separate start() function
-
 
         // Make producer, consumer, and merger
         KafkaMergeThread mergeThread = new KafkaMergeThread(kafkaBootstrapServers, mergerTopic, pathNum);
-        KafkaConsumerThread consumeThread = new KafkaConsumerThread(kafkaBootstrapServers, pathNum, mergeThread.partitionQueue, mergeThread.watermarks, flinkTopic);
 
         Thread merge = new Thread(mergeThread);
-        Thread consume = new Thread(consumeThread);
+        KWayMergerConsumer consumer = new KWayMergerConsumer(kafkaBootstrapServers, flinkTopic, mergeThread.partitionQueue);
 
-        merge.setDaemon(true);
-        consume.setDaemon(true);
 
-        consume.start();
+        consumer.run();
         merge.start();
 
-        try {
-            env.execute();
-            mergeThread.join();
-            consumeThread.stopRunning();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        merge.join();
+        consumer.stop();
     }
+
 }
 
 

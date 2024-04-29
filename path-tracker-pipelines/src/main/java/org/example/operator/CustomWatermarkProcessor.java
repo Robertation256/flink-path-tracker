@@ -25,17 +25,50 @@ import org.apache.flink.util.OutputTag;
 
 import org.example.datasource.DecorateRecord;
 
+import java.util.ArrayList;
+import java.util.List;
+
 // access and emit watermarks
 public class CustomWatermarkProcessor extends AbstractStreamOperator<DecorateRecord> implements OneInputStreamOperator<DecorateRecord, DecorateRecord> {
+    private String taskName = null;
+    private Integer subTaskId = null;
+    private List<String> pathIds = new ArrayList<>();
+    private List<String> broadcastTargets = new ArrayList<>();
+
+    public void setPathIds(List<String> pathIds){
+        this.pathIds = pathIds;
+    }
+
 
     @Override
     public void processElement(StreamRecord<DecorateRecord> element) {
+        if (taskName == null || subTaskId == null){
+            taskName = getRuntimeContext().getTaskInfo().getTaskName();
+            subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+        }
+        element.getValue().addAndSetPathInfo(taskName, subTaskId);
         output.collect(element);
     }
 
     @Override
     public void processWatermark(org.apache.flink.streaming.api.watermark.Watermark mark) {
-        output.collect(new StreamRecord<>(new DecorateRecord(mark.getTimestamp(), true)));
+        if (broadcastTargets.isEmpty()){
+            String vertexId = getRuntimeContext().getTaskInfo().getTaskName() + "_" + getRuntimeContext()
+                    .getTaskInfo()
+                    .getIndexOfThisSubtask();
+            for (String pathId : pathIds){
+                if (pathId.contains(vertexId)){
+                    broadcastTargets.add(pathId);
+                }
+            }
+        }
+
+        for (String pathId : broadcastTargets){
+            DecorateRecord watermarkRecord = new DecorateRecord(mark.getTimestamp(), true);
+            watermarkRecord.setPathInfo(pathId);
+            output.collect(new StreamRecord<>(watermarkRecord));
+        }
+
         output.emitWatermark(mark);
     }
 }

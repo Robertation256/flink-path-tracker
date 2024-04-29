@@ -20,11 +20,11 @@ package org.example;
 
 public class Configuration {
 
-    public static final long OPERATOR_WORKLOAD_CYCLES = 10L;
+    public static final long OPERATOR_WORKLOAD_CYCLES = 1000L;
 
-    public static final long WATERMARK_EMISSION_PERIOD_MILLIS = 200L;
+    public static final long WATERMARK_EMISSION_PERIOD_MILLIS = 10L;
 
     public static final int RECORD_PAYLOAD_BYTE_SIZE = 10;
 
-    public static final long DATASOURCE_SIZE = 6000000L;
+    public static final long DATASOURCE_SIZE = 10000000L;
 }

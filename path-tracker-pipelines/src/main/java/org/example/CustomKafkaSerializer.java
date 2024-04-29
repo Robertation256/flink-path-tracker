@@ -29,6 +29,10 @@ import org.example.utils.RecordSerdes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+
 
 public class CustomKafkaSerializer implements
         KafkaRecordSerializationSchema<DecorateRecord> {
@@ -37,6 +41,7 @@ public class CustomKafkaSerializer implements
     private static final Logger LOG = LoggerFactory.getLogger(CustomKafkaSerializer.class);
 
     private final String topic;
+    private  Map<String, Integer> pathIdToQueueId = null;
 
 
     public CustomKafkaSerializer(String topic)
@@ -44,13 +49,32 @@ public class CustomKafkaSerializer implements
         this.topic = topic;
     }
 
+    public CustomKafkaSerializer(String topic, Map<String, Integer> pathIdToQueueId)
+    {
+        this.topic = topic;
+        this.pathIdToQueueId = pathIdToQueueId;
+    }
+
     @Override
     public ProducerRecord<byte[], byte[]> serialize(
             DecorateRecord element, KafkaSinkContext context, Long timestamp) {
 
+
         try {
+
+            if (pathIdToQueueId != null){
+                if (!pathIdToQueueId.containsKey(element.getPathInfo())){
+                    LOG.error("Failed to decide queue for record: {}", element);
+                    System.exit(1);
+                }
+                element.setQueueId(pathIdToQueueId.get(element.getPathInfo()));
+            }
+
+            element.setSinkTime(Instant.now().toEpochMilli());
+
             return new ProducerRecord<>(
                     topic,
+                    element.getQueueId(),
                     Ints.toByteArray(element.getQueueId()) ,
                     RecordSerdes.toBytes(element)
             );

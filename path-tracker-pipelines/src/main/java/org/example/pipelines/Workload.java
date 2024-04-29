@@ -22,25 +22,26 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 
 import org.example.datasource.DecorateRecord;
 import org.example.operator.TestRichFilterFunctionImpl;
-import org.example.operator.TestRichMapFunctionImplForMul2;
-import org.example.operator.TestRichMapFunctionImplForSquare;
+import org.example.operator.TestRichMapFunction;
 
 import java.time.Instant;
 
 public class Workload {
 
     public static DataStream<DecorateRecord> attachTestPipeline(DataStream<DecorateRecord> datasource){
-        return datasource.filter(new TestRichFilterFunctionImpl()).setParallelism(3)
-                .rescale()
+        return datasource
+                .filter(new TestRichFilterFunctionImpl()).setParallelism(15)
+                .forward()
                 // multiply by 2
-                .map(new TestRichMapFunctionImplForMul2()).setParallelism(4)
-                .keyBy(DecorateRecord::getSeqNum)
+                .map(new TestRichMapFunction()).setParallelism(15)
+                .rebalance()
                 // square it
-                .map(new TestRichMapFunctionImplForSquare()).setParallelism(2)
+                .map(new TestRichMapFunction()).setParallelism(2)
+                .forward()
                 .map(
                     record -> {
                         record.setProcessCompletionTime(Instant.now().toEpochMilli());
                         return record;
-                    }).setParallelism(1);
+                    }).setParallelism(2);
     }
 }
