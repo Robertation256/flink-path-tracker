@@ -26,5 +26,5 @@ public class Configuration {
 
     public static final int RECORD_PAYLOAD_BYTE_SIZE = 10;
 
-    public static final long DATASOURCE_SIZE = 10000000L;
+    public static long DATASOURCE_SIZE = 10000000L;
 }

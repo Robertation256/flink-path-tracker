@@ -48,6 +48,7 @@ public class Main {
         String metricTopic = "";
         String bootstrapServers = "sp24-cs525-2118.cs.illinois.edu:9092";
 
+
         for (String arg: args){
             if (arg.contains("flink_topic=")){
                 flinkTopic = arg.split("=")[1];
@@ -63,11 +64,13 @@ public class Main {
             if (arg.contains("metric_topic=")){
                 metricTopic = arg.split("=")[1];
             }
-
+            if (arg.contains("num_records=")) {
+                Configuration.DATASOURCE_SIZE = Long.parseLong(arg.split("=")[1]);
+            }
         }
 
 
-        LOG.info(String.format("Launching with configuration: isBaseline=%b, flink_topic=%s, merger_topic:%s, kafka_server=%s",runBaseline, flinkTopic, mergerTopic, bootstrapServers));
+        LOG.info(String.format("Launching with configuration: isBaseline=%b, flink_topic=%s, merger_topic:%s, kafka_server=%s, num_records=%s",runBaseline, flinkTopic, mergerTopic, bootstrapServers, Configuration.DATASOURCE_SIZE));
 
         if (runBaseline){
             runBaseline(bootstrapServers, flinkTopic);
